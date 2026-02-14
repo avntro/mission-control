@@ -217,6 +217,9 @@ function renderBoard() {
       document.getElementById(`count-${status}`).textContent = items.length;
     }
   }
+  // Show/hide Approve All button
+  const approveAllBtn = document.getElementById('btn-approve-all');
+  if (approveAllBtn) { const rc = cols.review.length; approveAllBtn.style.display = rc > 0 ? 'inline-block' : 'none'; approveAllBtn.textContent = `✅ Approve All`; }
   document.querySelectorAll('.task-card:not(.live-task)').forEach(card => {
     card.addEventListener('dragstart', e => { draggedTaskId = card.dataset.id; card.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
     card.addEventListener('dragend', () => { card.classList.remove('dragging'); document.querySelectorAll('.col-cards').forEach(c => c.classList.remove('drag-over')); });
@@ -778,6 +781,14 @@ async function moveTask(id, status) { await fetch(`${API}/api/tasks/${id}`, { me
 async function deleteTask(id) { if (!confirm('Delete this task?')) return; await fetch(`${API}/api/tasks/${id}`, { method:'DELETE' }); closeDetail(); await loadTasks(); renderBoard(); }
 async function approveTask(id) { await fetch(`${API}/api/tasks/${id}/approve`, { method:'POST' }); closeDetail(); await loadTasks(); renderBoard(); }
 async function rejectTask(id) { await fetch(`${API}/api/tasks/${id}/reject`, { method:'POST' }); closeDetail(); await loadTasks(); renderBoard(); }
+async function approveAllReview() {
+  const reviewItems = [...tasks.filter(t=>t.status==='review'), ...liveTasks.filter(t=>t.status==='review')];
+  if (!reviewItems.length) return;
+  if (!confirm(`Approve all ${reviewItems.length} review items?`)) return;
+  const btn = document.getElementById('btn-approve-all'); if(btn) btn.textContent = '⏳ Approving...';
+  await Promise.all(reviewItems.map(t => fetch(`${API}/api/tasks/${t.id}/approve`, { method:'POST' })));
+  closeDetail(); await loadTasks(); renderBoard();
+}
 async function addComment(taskId) { const text = document.getElementById('commentText').value.trim(); if (!text) return; await fetch(`${API}/api/comments`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({task_id:taskId,content:text,agent:'',type:'comment'}) }); openDetail(taskId); }
 
 function openCreateModal() { document.getElementById('createModal').classList.add('open'); }

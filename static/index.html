@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="Mission Ctrl">
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-<link rel="stylesheet" href="/static/style.css?v=20260214u">
+<link rel="stylesheet" href="/static/style.css?v=20260214w">
 </head>
 <body>
 
@@ -86,7 +86,7 @@
             <div class="col-cards" id="col-in_progress" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)"></div>
           </div>
           <div class="kanban-col" data-status="review">
-            <div class="col-header"><span class="col-dot" style="background:#e040fb"></span>Review <span class="col-count" id="count-review">0</span></div>
+            <div class="col-header"><span class="col-dot" style="background:#e040fb"></span>Review <span class="col-count" id="count-review">0</span><button id="btn-approve-all" class="btn btn-sm" style="margin-left:auto;font-size:.7rem;padding:2px 8px;color:#4caf50;border:1px solid #4caf50;border-radius:4px;display:none;cursor:pointer" onclick="approveAllReview()">✅ Approve All</button></div>
             <div class="col-cards" id="col-review" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)"></div>
           </div>
           <div class="kanban-col" data-status="done">
@@ -323,7 +323,7 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=20260214t"></script>
+<script src="/static/app.js?v=20260214u"></script>
 <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js', {scope: '/'});</script>
 </body>
 </html>
