@@ -1617,17 +1617,29 @@ function openAgentSessions(agentName) {
 function openSubagentPanel(agentName, evt) {
   if (evt) { evt.stopPropagation(); evt.preventDefault(); }
   const info = AGENT_INFO[agentName] || { name: agentName, emoji: '🤖', color: '#888' };
-  const subs = liveTasks.filter(t => t.source === 'subagent' && t.assigned_agent === agentName);
 
-  // Sort: active first, then by created_at desc
-  subs.sort((a, b) => {
-    if (a.status === 'in_progress' && b.status !== 'in_progress') return -1;
-    if (b.status === 'in_progress' && a.status !== 'in_progress') return 1;
-    return (b.created_at || '').localeCompare(a.created_at || '');
+  // Use agentStats sessions (same data source as the card badge count)
+  const stats = agentStats.find(s => s.name === agentName);
+  const allSessions = (stats && stats.sessions) ? stats.sessions : [];
+  const subs = allSessions.filter(s => s.key && s.key.includes(':subagent:'));
+
+  // Enrich with live task data if available
+  const enriched = subs.map(s => {
+    const liveMatch = liveTasks.find(lt => lt.session_key === s.key);
+    return { ...s, liveMatch };
   });
 
-  const activeCount = subs.filter(s => s.status === 'in_progress').length;
-  const doneCount = subs.length - activeCount;
+  // Sort: active first, then by updatedAt desc
+  enriched.sort((a, b) => {
+    if (a.active && !b.active) return -1;
+    if (b.active && !a.active) return 1;
+    return (b.updatedAt || 0) - (a.updatedAt || 0);
+  });
+
+  const activeCount = enriched.filter(s => s.active).length;
+  const doneCount = enriched.length - activeCount;
+  const totalTokens = enriched.reduce((sum, s) => sum + (s.tokens || 0), 0);
+  const totalCost = enriched.reduce((sum, s) => sum + (s.cost || 0), 0);
 
   document.getElementById('subagentModalTitle').innerHTML =
     `${info.emoji} ${esc(info.name)} — Sub-agents`;
@@ -1636,42 +1648,57 @@ function openSubagentPanel(agentName, evt) {
 
   // Summary bar
   html += `<div class="subagent-summary">
-    <span class="subagent-summary-item"><span class="subagent-dot dot-active"></span>${activeCount} running</span>
+    <span class="subagent-summary-item"><span class="subagent-dot dot-active"></span>${activeCount} active</span>
     <span class="subagent-summary-item"><span class="subagent-dot dot-done"></span>${doneCount} completed</span>
-    <span class="subagent-summary-item">📊 ${subs.length} total</span>
+    <span class="subagent-summary-item">📊 ${enriched.length} total</span>
+    <span class="subagent-summary-item">🔤 ${formatTokens(totalTokens)}</span>
+    <span class="subagent-summary-item">💰 $${totalCost.toFixed(2)}</span>
   </div>`;
 
-  if (!subs.length) {
+  if (!enriched.length) {
     html += '<p style="text-align:center;color:var(--muted);padding:32px 0">No sub-agents found for this agent.</p>';
   } else {
     html += '<div class="subagent-list subagent-scroll">';
-    for (const s of subs) {
-      const isActive = s.status === 'in_progress';
-      const statusIcon = isActive ? '🔄' : s.status === 'review' ? '👀' : '✅';
-      const statusLabel = isActive ? 'Running' : s.status === 'review' ? 'Review' : 'Done';
-      const statusClass = isActive ? 'running' : s.status === 'review' ? 'review' : 'done';
+    for (const s of enriched) {
+      const isActive = s.active;
+      const statusIcon = isActive ? '🔄' : '✅';
+      const statusLabel = isActive ? 'Running' : 'Completed';
+      const statusClass = isActive ? 'running' : 'done';
 
-      // Duration
+      // Duration from live match
       let durHtml = '';
-      if (isActive && s.created_at) {
-        const elapsed = (Date.now() - new Date(s.created_at).getTime()) / 1000;
-        durHtml = `<span class="subagent-dur" data-created-at="${s.created_at}" data-tick-duration>⏱ ${formatDuration(elapsed)}</span>`;
-      } else if (s.duration) {
-        durHtml = `<span class="subagent-dur">⏱ ${formatDuration(s.duration)}</span>`;
+      if (s.liveMatch) {
+        if (isActive && s.liveMatch.created_at) {
+          const elapsed = (Date.now() - new Date(s.liveMatch.created_at).getTime()) / 1000;
+          durHtml = `<span class="subagent-dur" data-created-at="${s.liveMatch.created_at}" data-tick-duration>⏱ ${formatDuration(elapsed)}</span>`;
+        } else if (s.liveMatch.duration) {
+          durHtml = `<span class="subagent-dur">⏱ ${formatDuration(s.liveMatch.duration)}</span>`;
+        }
       }
 
       const modelStr = s.model ? s.model.replace('anthropic/', '').replace('claude-', 'c-') : '—';
       const costStr = s.cost != null && s.cost > 0 ? `$${s.cost.toFixed(2)}` : '—';
       const tokStr = s.tokens ? formatTokens(s.tokens) : '—';
-      const timeStr = s.created_at ? timeAgo(s.created_at) : '';
+      const timeStr = s.updatedAt ? timeAgo(new Date(s.updatedAt * 1000).toISOString()) : '';
+      const updatedIso = s.updatedAt ? new Date(s.updatedAt * 1000).toISOString() : '';
 
-      html += `<div class="subagent-row subagent-${statusClass}" onclick="document.getElementById('subagentModal').classList.remove('open');openLiveDetail('${s.id}')">
+      // Title: use live task title, or task field, or extract from session key
+      const title = (s.liveMatch && s.liveMatch.title) ? s.liveMatch.title : s.task || s.key.split(':subagent:').pop() || 'Sub-agent';
+
+      // Click to open live detail if available
+      const liveId = s.liveMatch ? s.liveMatch.id : null;
+      const clickAttr = liveId
+        ? `onclick="document.getElementById('subagentModal').classList.remove('open');openLiveDetail('${liveId}')"`
+        : '';
+      const clickClass = liveId ? ' subagent-clickable' : '';
+
+      html += `<div class="subagent-row subagent-${statusClass}${clickClass}" ${clickAttr}>
         <div class="subagent-row-top">
           <span class="subagent-status-badge status-${statusClass}">${statusIcon} ${statusLabel}</span>
           ${durHtml}
-          <span class="subagent-time" ${s.created_at ? `data-time-ago="${s.created_at}"` : ''}>${timeStr}</span>
+          <span class="subagent-time" ${updatedIso ? `data-time-ago="${updatedIso}"` : ''}>${timeStr}</span>
         </div>
-        <div class="subagent-row-title">${esc(s.title)}</div>
+        <div class="subagent-row-title">${esc(title)}</div>
         <div class="subagent-row-stats">
           <span>🔤 ${tokStr}</span>
           <span>💰 ${costStr}</span>
