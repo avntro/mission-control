@@ -634,7 +634,7 @@ async function openDetail(id) {
     html += buildPremiumModal(t, false);
 
     // 7. Description
-    if (t.description) html += `<div class="detail-section"><h3>Description</h3><div class="detail-desc">${esc(t.description)}</div></div>`;
+    if (t.description) html += `<div class="detail-section"><h3>Description</h3><div class="detail-desc">${renderMarkdown(t.description)}</div></div>`;
 
     // Attachments
     html += renderAttachmentsSection(t);
@@ -755,7 +755,7 @@ function openLiveDetail(id) {
   html += buildPremiumModal(t, true);
 
   // Description
-  if (t.description) html += `<div class="detail-section"><h3>Description</h3><div class="detail-desc">${esc(t.description)}</div></div>`;
+  if (t.description) html += `<div class="detail-section"><h3>Description</h3><div class="detail-desc">${renderMarkdown(t.description)}</div></div>`;
   html += renderAttachmentsSection(t);
 
   // Live session info
@@ -1017,14 +1017,34 @@ async function checkWorkspaceChanges() {
 }
 
 function renderMarkdown(text) {
-  return esc(text)
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/`(.+?)`/g, '<code>$1</code>')
-    .replace(/^- (.+)$/gm, '• $1')
-    .replace(/\n/g, '<br>');
+  // Code blocks first (preserve content)
+  let codeBlocks = [];
+  let out = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+    codeBlocks.push(`<pre><code class="lang-${lang||'text'}">${esc(code.trimEnd())}</code></pre>`);
+    return `%%CODEBLOCK_${codeBlocks.length-1}%%`;
+  });
+  out = esc(out);
+  // Inline code
+  out = out.replace(/`([^`]+?)`/g, '<code>$1</code>');
+  // Headers
+  out = out.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  out = out.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  out = out.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  // Bold + italic
+  out = out.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  out = out.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  out = out.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  // Links [text](url)
+  out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  // Bare URLs
+  out = out.replace(/(^|[^"'>])(https?:\/\/[^\s<]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+  // Lists
+  out = out.replace(/^- (.+)$/gm, '• $1');
+  // Line breaks
+  out = out.replace(/\n/g, '<br>');
+  // Restore code blocks
+  codeBlocks.forEach((block, i) => { out = out.replace(`%%CODEBLOCK_${i}%%`, block); });
+  return out;
 }
 
 // ══════════════════════════════════════════════════════════════

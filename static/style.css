@@ -44,7 +44,7 @@ body{
 .topnav-tabs:hover,.topnav-tabs:focus-within{mask-image:none;-webkit-mask-image:none}
 .topnav-tabs.has-overflow-right::after{content:'›';position:sticky;right:0;padding:0 4px;color:var(--accent);font-size:1.2rem;font-weight:700;opacity:.7;pointer-events:none;background:linear-gradient(to right,transparent,var(--surface) 40%)}
 .topnav-tabs.has-overflow-left::before{content:'‹';position:sticky;left:0;padding:0 4px;color:var(--accent);font-size:1.2rem;font-weight:700;opacity:.7;pointer-events:none;background:linear-gradient(to left,transparent,var(--surface) 40%)}
-.nav-tab{padding:8px 14px;border-radius:var(--radius);border:none;background:transparent;color:var(--muted);font-size:.82rem;cursor:pointer;font-weight:500;transition:all .15s;white-space:nowrap}
+.nav-tab{padding:8px 10px;border-radius:var(--radius);border:none;background:transparent;color:var(--muted);font-size:.82rem;cursor:pointer;font-weight:500;transition:all .15s;white-space:nowrap}
 .nav-tab.active{background:var(--accent);color:#fff;box-shadow:0 0 12px rgba(0,188,212,0.3)}
 .nav-tab:hover:not(.active){color:var(--text);background:var(--card)}
 .topnav-right{display:flex;align-items:center;gap:6px;font-size:.82rem;color:var(--muted);margin-left:16px;white-space:nowrap}
