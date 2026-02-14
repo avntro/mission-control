@@ -1,0 +1,15 @@
+version: '3.8'
+services:
+  mission-control:
+    build: .
+    container_name: mission-control
+    restart: unless-stopped
+    ports:
+      - "3335:3335"
+    volumes:
+      - mc-data:/data
+    environment:
+      - MC_DB=/data/mission_control.db
+
+volumes:
+  mc-data:

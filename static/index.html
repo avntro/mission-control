@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mission Control — OpenClaw</title>
+<meta name="theme-color" content="#0f0f1a">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="header-left">
+    <span class="logo">⚡</span>
+    <h1>Mission Control</h1>
+    <span class="badge" id="taskCount">0 tasks</span>
+  </div>
+  <div class="header-right">
+    <button class="btn btn-primary" onclick="openCreateModal()">+ New Task</button>
+    <div class="header-status">
+      <span class="dot dot-green"></span>
+      <span id="agentStatusSummary">6 agents</span>
+    </div>
+  </div>
+</header>
+
+<!-- Main Layout -->
+<div class="layout">
+  <!-- Left: Agents Panel -->
+  <aside class="sidebar" id="agentsPanel">
+    <h2>🤖 Agents</h2>
+    <div id="agentsList"></div>
+  </aside>
+
+  <!-- Center: Kanban Board -->
+  <main class="main">
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="board" onclick="switchTab('board')">📋 Board</button>
+      <button class="tab" data-tab="activity" onclick="switchTab('activity')">📡 Activity</button>
+    </div>
+
+    <!-- Board View -->
+    <div class="tab-content active" id="boardView">
+      <div class="kanban">
+        <div class="kanban-col" data-status="todo">
+          <div class="col-header"><span class="col-dot" style="background:#6c63ff"></span>Todo <span class="col-count" id="count-todo">0</span></div>
+          <div class="col-cards" id="col-todo" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)"></div>
+        </div>
+        <div class="kanban-col" data-status="in_progress">
+          <div class="col-header"><span class="col-dot" style="background:#ffab40"></span>In Progress <span class="col-count" id="count-in_progress">0</span></div>
+          <div class="col-cards" id="col-in_progress" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)"></div>
+        </div>
+        <div class="kanban-col" data-status="review">
+          <div class="col-header"><span class="col-dot" style="background:#e040fb"></span>Review <span class="col-count" id="count-review">0</span></div>
+          <div class="col-cards" id="col-review" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)"></div>
+        </div>
+        <div class="kanban-col" data-status="done">
+          <div class="col-header"><span class="col-dot" style="background:#00E676"></span>Done <span class="col-count" id="count-done">0</span></div>
+          <div class="col-cards" id="col-done" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity View -->
+    <div class="tab-content" id="activityView">
+      <div class="activity-header">
+        <select id="activityFilter" onchange="loadActivity()">
+          <option value="">All Agents</option>
+          <option value="main">Mike</option>
+          <option value="trading">Trading / AA</option>
+          <option value="it-support">IT Support</option>
+          <option value="dev">Dev</option>
+          <option value="voice">Voice</option>
+          <option value="troubleshoot">Troubleshoot</option>
+        </select>
+      </div>
+      <div id="activityFeed"></div>
+    </div>
+  </main>
+</div>
+
+<!-- Task Detail Modal -->
+<div class="modal-overlay" id="detailModal" onclick="closeDetailIfOutside(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 id="detailTitle"></h2>
+      <button class="modal-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="modal-body" id="detailBody"></div>
+  </div>
+</div>
+
+<!-- Create Task Modal -->
+<div class="modal-overlay" id="createModal" onclick="closeCreateIfOutside(event)">
+  <div class="modal modal-sm" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>New Task</h2>
+      <button class="modal-close" onclick="closeCreate()">✕</button>
+    </div>
+    <form class="modal-body" onsubmit="createTask(event)">
+      <label>Title *</label>
+      <input type="text" id="newTitle" required placeholder="Task title...">
+      <label>Description</label>
+      <textarea id="newDesc" rows="3" placeholder="Details..."></textarea>
+      <label>Assign to Agent</label>
+      <select id="newAgent">
+        <option value="">Unassigned</option>
+        <option value="main">Mike</option>
+        <option value="trading">Trading / AA</option>
+        <option value="it-support">IT Support</option>
+        <option value="dev">Dev</option>
+        <option value="voice">Voice</option>
+        <option value="troubleshoot">Troubleshoot</option>
+      </select>
+      <label>Priority</label>
+      <select id="newPriority">
+        <option value="low">Low</option>
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+        <option value="critical">Critical</option>
+      </select>
+      <div class="form-actions">
+        <button type="button" class="btn" onclick="closeCreate()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Task</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
