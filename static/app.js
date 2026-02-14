@@ -8,6 +8,28 @@ let draggedTaskId = null;
 let currentPage = 'dashboard';
 let workspaces = [];
 let orgExpanded = true;
+
+function cleanTitle(title) {
+  if (!title) return 'Untitled';
+  let t = title;
+  // Strip timestamps like [Sat 2026-02-14 18:24 GMT+2]
+  t = t.replace(/\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?:\s*[A-Z]{2,5}[+-]?\d*)?\]/gi, '');
+  // Strip URLs
+  t = t.replace(/https?:\/\/[^\s)]+/g, '');
+  // Strip markdown bold/italic
+  t = t.replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1');
+  t = t.replace(/_{1,3}([^_]+)_{1,3}/g, '$1');
+  // Strip markdown links [text](url)
+  t = t.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+  // Clean up extra whitespace, dashes, pipes
+  t = t.replace(/\s*[|—–]\s*$/, '').replace(/^\s*[|—–]\s*/, '');
+  t = t.replace(/\s+/g, ' ').trim();
+  // Truncate to ~60 chars at word boundary
+  if (t.length > 60) {
+    t = t.substring(0, 60).replace(/\s+\S*$/, '') + '…';
+  }
+  return t || 'Untitled';
+}
 let wsEditMode = false;
 let wsCurrentAgent = null;
 let wsCurrentFile = null;
@@ -202,7 +224,7 @@ function liveTaskCardHTML(t) {
   const badgeClass = t.status === 'in_progress' ? 'task-live-badge' : 'task-live-badge' + (t.status === 'done' ? ' badge-done' : ' badge-review');
   return `<div class="task-card live-task${activePulse}" data-id="${t.id}" onclick="openLiveDetail('${t.id}')">
     <div class="${badgeClass}">${badgeLabel}</div>
-    <div class="task-title">${esc(t.title)}</div>
+    <div class="task-title">${esc(cleanTitle(t.title))}</div>
     <div class="task-meta">
       <span class="task-agent">${info.emoji} ${info.name}</span>
       ${tokens ? `<span class="task-tokens">🔤 ${tokens}</span>` : ''}
@@ -228,7 +250,7 @@ function taskCardHTML(t) {
   const tTimeRef = (t.status === 'done' || t.status === 'review') ? (t.completed_at || t.updated_at || t.created_at) : t.created_at;
   const tTimeLabel = (t.status === 'done' || t.status === 'review') ? 'completed ' : '';
   return `<div class="task-card" draggable="true" data-id="${t.id}" onclick="openDetail('${t.id}')">
-    <div class="task-title">${esc(t.title)}</div>
+    <div class="task-title">${esc(cleanTitle(t.title))}</div>
     <div class="task-meta">
       <span class="task-agent">${esc(agentLabel)}</span>
       <span class="task-priority priority-${t.priority}">${t.priority}</span>

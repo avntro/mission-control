@@ -1590,7 +1590,11 @@ def manifest():
 
 @app.get("/sw.js")
 def service_worker():
-    return FileResponse(os.path.join(STATIC_DIR, "sw.js"), media_type="application/javascript")
+    from starlette.responses import Response
+    sw_path = os.path.join(STATIC_DIR, "sw.js")
+    with open(sw_path, "r") as f:
+        content = f.read()
+    return Response(content=content, media_type="application/javascript", headers={"Service-Worker-Allowed": "/"})
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
