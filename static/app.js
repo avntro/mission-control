@@ -1231,15 +1231,31 @@ function renderDocMarkdown(text) {
   html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
   html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
   html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  // Horizontal rules
+  html = html.replace(/^---+$/gm, '<hr>');
   // Bold, italic, code
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
   html = html.replace(/`(.+?)`/g, '<code>$1</code>');
   // Links
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+  // Tables (pipe-delimited)
+  html = html.replace(/((?:^\|.+\|$\n?)+)/gm, function(tableBlock) {
+    const rows = tableBlock.trim().split('\n').filter(r => r.trim());
+    if (rows.length < 2) return tableBlock;
+    let t = '<table class="md-table">';
+    rows.forEach((row, i) => {
+      if (row.replace(/[|\-\s:]/g, '') === '') return; // skip separator row
+      const cells = row.split('|').filter((c, j, a) => j > 0 && j < a.length - 1);
+      const tag = i === 0 ? 'th' : 'td';
+      t += '<tr>' + cells.map(c => `<${tag}>${c.trim()}</${tag}>`).join('') + '</tr>';
+    });
+    t += '</table>';
+    return t;
+  });
   // Lists
   html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
-  html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+  html = html.replace(/((?:<li>.*?<\/li>\s*)+)/gs, '<ul>$1</ul>');
   // Blockquotes
   html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
   // Line breaks
@@ -1668,7 +1684,7 @@ async function openReport(id) {
       <div class="report-detail-layout">
         <div class="report-detail-main">
           <h2 style="margin:12px 0 16px;font-size:1.3rem">${esc(r.title)}</h2>
-          <div class="doc-content">${renderDocMarkdown(r.content || '')}</div>
+          <div class="doc-content">${renderDocMarkdown((r.content || '').replace(/^# .+\n+/, ''))}</div>
           ${screenshots ? `<div class="report-screenshots"><h3 style="font-size:.85rem;color:var(--muted);margin:20px 0 10px">📷 Screenshots</h3><div class="report-screenshots-grid">${screenshots}</div></div>` : ''}
         </div>
         <aside class="report-detail-sidebar">
