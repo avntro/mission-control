@@ -390,15 +390,14 @@ def list_tasks(status: Optional[str] = None, agent: Optional[str] = None):
     conn = get_db()
     q = "SELECT * FROM tasks"
     params = []
-    wheres = []
+    wheres = ["id NOT LIKE 'live-%'"]  # live-* tasks are served by /api/live-tasks
     if status:
         wheres.append("status = ?")
         params.append(status)
     if agent:
         wheres.append("assigned_agent = ?")
         params.append(agent)
-    if wheres:
-        q += " WHERE " + " AND ".join(wheres)
+    q += " WHERE " + " AND ".join(wheres)
     q += " ORDER BY CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END, created_at DESC"
     rows = conn.execute(q, params).fetchall()
     conn.close()
@@ -1130,10 +1129,10 @@ def approve_task(task_id: str):
                      (ts, ts, task_id))
         add_activity(conn, row["assigned_agent"] or "user", "task_approved", f"Approved: {row['title']}", task_id)
     else:
-        # For live tasks, create a DB record to persist the approved status
+        # For live tasks, create a minimal status marker (not rendered by /api/tasks — filtered by live- prefix)
         conn.execute(
-            "INSERT INTO tasks (id, title, description, assigned_agent, priority, status, created_at, updated_at, completed_at) VALUES (?,?,?,?,?,?,?,?,?)",
-            (task_id, "Approved task", "", "", "medium", "done", ts, ts, ts)
+            "INSERT INTO tasks (id, title, status, created_at, updated_at, completed_at) VALUES (?,?,?,?,?,?)",
+            (task_id, task_id, "done", ts, ts, ts)
         )
         add_activity(conn, "user", "task_approved", f"Approved: {task_id}", task_id)
     conn.commit()
@@ -1151,32 +1150,12 @@ def reject_task(task_id: str):
                      (ts, task_id))
         add_activity(conn, row["assigned_agent"] or "user", "task_rejected", f"Rejected: {row['title']}", task_id)
     else:
-        # For live tasks, try to pull session metadata so the DB row isn't empty
-        live_data = {}
-        try:
-            live_list = get_live_tasks(agents="all")
-            for lt in live_list:
-                if lt["id"] == task_id:
-                    live_data = lt
-                    break
-        except Exception:
-            pass
+        # For live tasks, create a minimal status marker (not rendered by /api/tasks — filtered by live- prefix)
         conn.execute(
-            "INSERT INTO tasks (id, title, description, assigned_agent, priority, status, model, cost, tokens, duration, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-            (task_id,
-             live_data.get("title", "Rejected task"),
-             live_data.get("description", ""),
-             live_data.get("assigned_agent", ""),
-             live_data.get("priority", "medium"),
-             "todo",
-             live_data.get("model", ""),
-             live_data.get("cost", 0),
-             live_data.get("tokens", 0),
-             live_data.get("duration"),
-             live_data.get("created_at", ts),
-             ts)
+            "INSERT INTO tasks (id, title, status, created_at, updated_at) VALUES (?,?,?,?,?)",
+            (task_id, task_id, "todo", ts, ts)
         )
-        add_activity(conn, live_data.get("assigned_agent", "user"), "task_rejected", f"Rejected: {live_data.get('title', task_id)}", task_id)
+        add_activity(conn, "user", "task_rejected", f"Rejected: {task_id}", task_id)
     conn.commit()
     conn.close()
     return {"ok": True, "status": "todo"}
