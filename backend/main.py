@@ -1418,6 +1418,10 @@ def get_live_tasks():
             # Clean up raw title: remove [cron:...] and [date] prefixes
             raw_title = re.sub(r'\[cron:[^\]]+\]\s*', '', title)
             raw_title = re.sub(r'\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+GMT[^\]]*\]\s*', '', raw_title).strip()
+            # Strip URLs early so they don't pollute any title extraction
+            raw_title = re.sub(r'\(?https?://[^\s)]+\)?', '', raw_title).strip()
+            # Collapse multiple spaces left by URL removal
+            raw_title = re.sub(r'  +', ' ', raw_title)
 
             # Smart title selection: label > extracted short title > agent name
             def make_smart_title(raw: str, label: str, key: str) -> str:
@@ -1462,10 +1466,23 @@ def get_live_tasks():
                         return candidate
                     return _truncate(candidate)
 
-                # 4. Take first meaningful line (skip lines with paths/URLs)
+                # 4. Take first meaningful line, strip URLs and prefixes
                 for line in raw.split('\n')[:5]:
                     line = line.strip()
                     if not line or line.startswith('http') or line.startswith('/'):
+                        continue
+                    # Strip inline URLs (including parenthesized ones)
+                    line = re.sub(r'\(?https?://[^\s)]+\)?', '', line).strip()
+                    # Strip leading prefix labels like "CRITICAL:", "BUG:", "PRIORITY:", compound "URGENT BUG:", etc.
+                    line = re.sub(r'^(?:CRITICAL|URGENT|PRIORITY|IMPORTANT|MANDATORY)(?:\s+(?:BUG|TASK|FIX|ISSUE))?\s*:\s*', '', line, flags=re.IGNORECASE).strip()
+                    line = re.sub(r'^(?:BUG|TASK|FIX|AUDIT\s*TASK|TODO|NOTE|ISSUE|ADDITIONAL\s*BUG|ADDITIONAL)\s*:\s*', '', line, flags=re.IGNORECASE).strip()
+                    # Collapse leftover double spaces
+                    line = re.sub(r'  +', ' ', line)
+                    # Strip markdown emphasis remnants
+                    line = re.sub(r'\*+', '', line).strip()
+                    # Remove trailing punctuation clusters
+                    line = re.sub(r'[\s:,\-]+$', '', line).strip()
+                    if not line:
                         continue
                     if len(line) <= 60:
                         return line
@@ -1566,6 +1583,14 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "static")
 @app.get("/")
 def index():
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+
+@app.get("/manifest.json")
+def manifest():
+    return FileResponse(os.path.join(STATIC_DIR, "manifest.json"), media_type="application/manifest+json")
+
+@app.get("/sw.js")
+def service_worker():
+    return FileResponse(os.path.join(STATIC_DIR, "sw.js"), media_type="application/javascript")
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
