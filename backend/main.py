@@ -107,6 +107,41 @@ def get_db():
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
 
+AGENT_EMOJI_MAP = {
+    "main": "🎯", "trading": "📈", "it-support": "🔧", "dev": "💻",
+    "voice": "🎙️", "troubleshoot": "🔍", "docs": "📚", "researcher": "🔬",
+    "security": "🛡️",
+}
+
+def _sync_agents_from_config(conn):
+    """Sync agents table from openclaw.json config — auto-discovers new agents."""
+    config_path = os.path.join(OPENCLAW_HOME, "openclaw.json")
+    try:
+        with open(config_path, "r") as f:
+            cfg = json.load(f)
+        agent_list = cfg.get("agents", {}).get("list", [])
+    except Exception:
+        return
+    existing = {r[0] for r in conn.execute("SELECT name FROM agents").fetchall()}
+    for a in agent_list:
+        aid = a.get("id", "")
+        if not aid:
+            continue
+        display = a.get("name", aid)
+        desc = a.get("description", "")
+        model_raw = a.get("model", "")
+        # Extract short model name
+        model = model_raw.split("/")[-1] if "/" in model_raw else model_raw
+        emoji = AGENT_EMOJI_MAP.get(aid, "🤖")
+        if aid not in existing:
+            conn.execute(
+                "INSERT INTO agents (name, display_name, model, status, emoji) VALUES (?,?,?,?,?)",
+                (aid, display, model, "idle", emoji)
+            )
+        else:
+            # Update model from config (source of truth)
+            conn.execute("UPDATE agents SET model = ?, display_name = ? WHERE name = ?", (model, display, aid))
+
 def init_db():
     conn = get_db()
     conn.executescript("""
@@ -200,32 +235,8 @@ def init_db():
         except Exception:
             pass
     conn.commit()
-    # Seed agents if empty
-    existing = conn.execute("SELECT COUNT(*) FROM agents").fetchone()[0]
-    if existing == 0:
-        agents_data = [
-            ("main", "Mike", "claude-opus-4-6", "idle", "🎯"),
-            ("trading", "Trading / AA", "claude-opus-4-6", "idle", "📈"),
-            ("it-support", "IT Support", "claude-sonnet-4.5", "idle", "🔧"),
-            ("dev", "Dev", "claude-opus-4-6", "idle", "💻"),
-            ("voice", "Voice", "claude-sonnet-4.5", "idle", "🎙️"),
-            ("troubleshoot", "Troubleshoot", "claude-opus-4-6", "idle", "🔍"),
-        ]
-        conn.executemany(
-            "INSERT INTO agents (name, display_name, model, status, emoji) VALUES (?,?,?,?,?)",
-            agents_data
-        )
-    # Always update model names to correct values (migration)
-    model_corrections = [
-        ("main", "claude-opus-4-6"),
-        ("trading", "claude-opus-4-6"),
-        ("it-support", "claude-sonnet-4.5"),
-        ("dev", "claude-opus-4-6"),
-        ("voice", "claude-sonnet-4.5"),
-        ("troubleshoot", "claude-opus-4-6"),
-    ]
-    for agent_name, correct_model in model_corrections:
-        conn.execute("UPDATE agents SET model = ? WHERE name = ?", (correct_model, agent_name))
+    # Sync agents from OpenClaw config (auto-discover new agents)
+    _sync_agents_from_config(conn)
     conn.commit()
     conn.close()
 

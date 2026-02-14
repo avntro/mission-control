@@ -583,16 +583,14 @@ function renderOrgChart() {
   const tree = document.getElementById('orgTree');
   const getStatus = (name) => { const a = agents.find(a => a.name === name); return a ? a.status : 'idle'; };
   const statusDot = (s) => { const color = s === 'busy' ? '#ffab40' : s === 'error' ? '#ff5252' : '#00E676'; return `<span class="dot" style="background:${color};box-shadow:0 0 6px ${color}"></span>`; };
-  const childAgents = [
-    { id:'trading', name:'Trading / AA', role:'Trading Specialist', emoji:'📈', model:'anthropic/claude-opus-4-6' },
-    { id:'it-support', name:'IT Support', role:'Infrastructure', emoji:'🔧', model:'anthropic/claude-sonnet-4-20250514' },
-    { id:'dev', name:'Dev', role:'Software Development', emoji:'💻', model:'anthropic/claude-opus-4-6' },
-    { id:'voice', name:'Voice', role:'Voice Assistant', emoji:'🎙️', model:'anthropic/claude-sonnet-4-20250514' },
-    { id:'troubleshoot', name:'Troubleshoot', role:'Troubleshooting', emoji:'🔍', model:'anthropic/claude-opus-4-6' },
-    { id:'docs', name:'Docs', role:'Documentation & Knowledge', emoji:'📚', model:'anthropic/claude-sonnet-4-20250514' },
-    { id:'researcher', name:'Researcher', role:'Discovery & Proposals', emoji:'🔬', model:'anthropic/claude-sonnet-4-20250514' },
-    { id:'security', name:'Security', role:'Security & Auditing', emoji:'🛡️', model:'anthropic/claude-sonnet-4-20250514' },
-  ];
+  // Dynamic: derive child agents from live agents data (exclude 'main' which is Mike/COO)
+  const childAgents = agents.filter(a => a.name !== 'main').map(a => ({
+    id: a.name,
+    name: a.display_name || a.name,
+    role: a.current_task || '',
+    emoji: a.emoji || '🤖',
+    model: a.model || 'unknown',
+  }));
   const collapsed = orgExpanded ? '' : 'collapsed';
   tree.innerHTML = `
     <div class="org-level"><div class="org-node" onclick="toggleOrgChildren('mike-children')"><div class="org-node-avatar">👤</div><div class="org-node-name">Argyris</div><div class="org-node-role">Owner · CEO · Vision & Strategy</div><div class="org-node-status">${statusDot('idle')} <span style="color:var(--green)">Online</span></div></div></div>
