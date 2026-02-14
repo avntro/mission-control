@@ -209,7 +209,6 @@ async function drop(e) {
 }
 
 let _lastAgentsJSON = '';
-let _lastAgentsStableHTML = '';
 let _lastAgentStatsJSON = '';
 async function loadAgents() {
   try {
@@ -226,7 +225,7 @@ function renderAgents() {
   const activeCount = agentStats.filter(s => s.active).length;
   const statusEl = document.getElementById('navStatus');
   if (statusEl) statusEl.textContent = `${agents.length} agents · ${activeCount} active`;
-  const newHTML = agents.map(a => {
+  const items = agents.map(a => {
     const stats = agentStats.find(s => s.name === a.name);
     const isActive = stats ? stats.active : a.status === 'busy';
     const statusLabel = isActive ? 'active' : 'idle';
@@ -238,20 +237,39 @@ function renderAgents() {
     const modelStr = (stats && stats.model) ? stats.model.replace('anthropic/', '') : (a.model ? a.model.replace('anthropic/', '') : '—');
     const sessCount = stats ? stats.active_sessions : 0;
     const lastAct = a.last_activity ? timeAgo(a.last_activity) : 'No activity';
-    return `<div class="agent-card">
-      <div class="agent-top"><span class="agent-emoji">${a.emoji}</span><span class="agent-name">${esc(a.display_name)}</span><span class="agent-status status-${statusClass}">${statusLabel}</span></div>
-      <div class="agent-token-row"><span class="agent-token-label">Context</span><span class="agent-token-value">${tokenStr}</span></div>
-      <div class="agent-ctx-bar"><div class="agent-ctx-fill" style="width:${Math.min(ctxPct,100)}%;background:${ctxBarColor}"></div></div>
-      <div class="agent-meta-model">🧠 ${esc(modelStr)}</div>
-      <div class="agent-meta"><span>💰 ${costStr}</span><span ${a.last_activity ? `data-time-ago="${a.last_activity}" data-time-prefix="🕐 "` : ''}>🕐 ${lastAct}</span></div>
-    </div>`;
-  }).join('');
-  // Only replace DOM when structural data changes (not just time-ago text)
-  const stableHTML = newHTML.replace(/>\u{1F550} [^<]*/gu, '>\u{1F550}');
-  if (stableHTML !== _lastAgentsStableHTML) {
-    el.innerHTML = newHTML;
-    _lastAgentsStableHTML = stableHTML;
+    return { name: a.name, emoji: a.emoji, displayName: a.display_name, statusLabel, statusClass, tokenStr, ctxPct, ctxBarColor, costStr, modelStr, lastAct, lastActivity: a.last_activity || '' };
+  });
+  // Check if agent list structure changed
+  const cards = el.querySelectorAll('.agent-card[data-agent]');
+  const cardNames = Array.from(cards).map(c => c.dataset.agent);
+  const desiredNames = items.map(d => d.name);
+  if (cardNames.join(',') !== desiredNames.join(',')) {
+    // Full re-render
+    el.innerHTML = items.map(d => `<div class="agent-card" data-agent="${d.name}">
+      <div class="agent-top"><span class="agent-emoji">${d.emoji}</span><span class="agent-name">${esc(d.displayName)}</span><span class="agent-status status-${d.statusClass}">${d.statusLabel}</span></div>
+      <div class="agent-token-row"><span class="agent-token-label">Context</span><span class="agent-token-value">${d.tokenStr}</span></div>
+      <div class="agent-ctx-bar"><div class="agent-ctx-fill" style="width:${Math.min(d.ctxPct,100)}%;background:${d.ctxBarColor}"></div></div>
+      <div class="agent-meta-model">🧠 ${esc(d.modelStr)}</div>
+      <div class="agent-meta"><span>💰 ${d.costStr}</span><span ${d.lastActivity ? `data-time-ago="${d.lastActivity}"` : ''}>🕐 ${d.lastAct}</span></div>
+    </div>`).join('');
+    return;
   }
+  // Patch in-place — no DOM replacement, no flicker
+  items.forEach((d, i) => {
+    const card = cards[i];
+    const statusSpan = card.querySelector('.agent-status');
+    if (statusSpan.textContent !== d.statusLabel) { statusSpan.textContent = d.statusLabel; statusSpan.className = `agent-status status-${d.statusClass}`; }
+    const tokenVal = card.querySelector('.agent-token-value');
+    if (tokenVal) tokenVal.textContent = d.tokenStr;
+    const ctxFill = card.querySelector('.agent-ctx-fill');
+    if (ctxFill) { ctxFill.style.width = Math.min(d.ctxPct, 100) + '%'; ctxFill.style.background = d.ctxBarColor; }
+    const modelEl = card.querySelector('.agent-meta-model');
+    if (modelEl) modelEl.textContent = '🧠 ' + d.modelStr;
+    const costEl = card.querySelector('.agent-meta > span:first-child');
+    if (costEl) costEl.textContent = '💰 ' + d.costStr;
+    const timeEl = card.querySelector('.agent-meta > span:last-child');
+    if (timeEl && d.lastActivity) { timeEl.dataset.timeAgo = d.lastActivity; }
+  });
 }
 
 function formatTokens(n) {
@@ -289,17 +307,71 @@ function switchTab(tab) {
 }
 
 // ── Task Detail Modal ──────────────────────────────────────────
+function buildPremiumModal(t, isLive) {
+  const info = AGENT_INFO[t.assigned_agent] || { name: t.assigned_agent || 'Unassigned', emoji: '🤖', color: '#888' };
+  const agentFromDB = agents.find(a => a.name === t.assigned_agent);
+  const agentName = agentFromDB ? agentFromDB.display_name : info.name;
+  const agentEmoji = agentFromDB ? agentFromDB.emoji : info.emoji;
+  const agentColor = info.color || 'var(--accent)';
+
+  const isDone = t.status === 'done' || t.status === 'review';
+  const isActive = t.status === 'in_progress';
+  const statusBadge = isActive
+    ? `<span class="premium-status-badge live">🔄 LIVE</span>`
+    : `<span class="premium-status-badge completed">✅ ${(t.status || 'done').replace('_',' ').toUpperCase()}</span>`;
+
+  // Duration
+  let dur = '—';
+  if (isActive && t.created_at) {
+    const elapsed = (Date.now() - new Date(t.created_at).getTime()) / 1000;
+    dur = `<span data-created-at="${t.created_at}" data-tick-duration="1">` + formatDuration(elapsed) + '</span>';
+  } else if (t.duration) {
+    dur = formatDuration(t.duration);
+  }
+
+  const modelStr = t.model || '—';
+  const costStr = t.cost != null && t.cost > 0 ? `$${t.cost.toFixed(2)}` : '—';
+  const tokens = t.tokens ? formatTokens(t.tokens) + ' tokens' : '—';
+  const startTime = t.created_at ? new Date(t.created_at).toLocaleString() : '—';
+  const startAgo = t.created_at ? timeAgo(t.created_at) : '';
+
+  let html = statusBadge;
+
+  // Agent row
+  html += `<div class="premium-agent">
+    <div class="premium-agent-icon" style="background:${agentColor}22;border:1px solid ${agentColor}44">${agentEmoji}</div>
+    <div><div class="premium-agent-name">${esc(agentName)}</div><div class="premium-agent-role">${esc(t.assigned_agent || 'unassigned')}</div></div>
+  </div>`;
+
+  // Stats grid
+  html += `<div class="premium-grid">
+    <div class="premium-stat"><div class="stat-icon">⏱</div><div class="stat-label">Duration</div><div class="stat-value">${dur}</div></div>
+    <div class="premium-stat"><div class="stat-icon">🪙</div><div class="stat-label">Tokens</div><div class="stat-value">${tokens}</div></div>
+    <div class="premium-stat"><div class="stat-icon">💰</div><div class="stat-label">Est. Cost</div><div class="stat-value">${costStr}</div></div>
+    <div class="premium-stat"><div class="stat-icon">🤖</div><div class="stat-label">Model</div><div class="stat-value" style="font-size:.76rem">${esc(modelStr)}</div></div>
+    <div class="premium-stat"><div class="stat-icon">📅</div><div class="stat-label">Started</div><div class="stat-value" style="font-size:.76rem">${startTime}</div></div>
+    <div class="premium-stat"><div class="stat-icon">🕐</div><div class="stat-label">Ago</div><div class="stat-value" data-time-ago="${t.created_at || ''}" data-time-prefix="">${startAgo}</div></div>
+  </div>`;
+
+  // Session key
+  if (t.session_key || t.id) {
+    html += `<div class="premium-session">🔑 ${esc(t.session_key || t.id)}</div>`;
+  }
+
+  return html;
+}
+
 async function openDetail(id) {
   try {
     const res = await fetch(`${API}/api/tasks/${id}`);
     const t = await res.json();
     document.getElementById('detailTitle').textContent = t.title;
-    const agent = agents.find(a => a.name === t.assigned_agent);
-    const agentLabel = agent ? `${agent.emoji} ${agent.display_name}` : (t.assigned_agent || 'Unassigned');
-    const dur = t.duration ? formatDuration(t.duration) : '—';
-    let html = `<div class="detail-actions">${['todo','in_progress','review','done'].map(s => `<button class="btn btn-sm ${t.status===s?'btn-primary':''}" onclick="moveTask('${t.id}','${s}')">${s.replace('_',' ')}</button>`).join('')}<button class="btn btn-sm btn-danger" onclick="deleteTask('${t.id}')">🗑 Delete</button></div>
-      <div class="detail-section"><div class="detail-meta"><div class="detail-meta-item"><div class="label">Agent</div><div class="value">${esc(agentLabel)}</div></div><div class="detail-meta-item"><div class="label">Priority</div><div class="value"><span class="task-priority priority-${t.priority}">${t.priority}</span></div></div><div class="detail-meta-item"><div class="label">Created</div><div class="value">${new Date(t.created_at).toLocaleString()}</div></div><div class="detail-meta-item"><div class="label">Duration</div><div class="value">${dur}</div></div></div></div>`;
-    if (t.description) html += `<div class="detail-section"><h3>Description</h3><div class="detail-desc">${esc(t.description)}</div></div>`;
+
+    let html = `<div class="premium-actions">${['todo','in_progress','review','done'].map(s => `<button class="btn btn-sm ${t.status===s?'btn-primary':''}" onclick="moveTask('${t.id}','${s}')">${s.replace('_',' ')}</button>`).join('')}<button class="btn btn-sm btn-danger" onclick="deleteTask('${t.id}')">🗑</button></div>`;
+
+    html += buildPremiumModal(t, false);
+
+    if (t.description) html += `<div class="detail-section" style="margin-top:20px"><h3>Description</h3><div class="detail-desc">${esc(t.description)}</div></div>`;
     if (t.comments && t.comments.length) {
       html += `<div class="detail-section"><h3>Comments & Logs (${t.comments.length})</h3>`;
       t.comments.forEach(c => { const cA = agents.find(a => a.name === c.agent); const cN = cA ? cA.display_name : (c.agent || 'System'); html += `<div class="comment-item type-${c.type}"><div class="comment-header"><span>${esc(cN)} · ${c.type}</span><span>${timeAgo(c.created_at)}</span></div><div class="comment-content">${esc(c.content)}</div></div>`; });
@@ -322,32 +394,9 @@ function closeDetailIfOutside(e) { if (e.target === e.currentTarget) closeDetail
 function openLiveDetail(id) {
   const t = liveTasks.find(lt => lt.id === id);
   if (!t) return;
-  const info = AGENT_INFO[t.assigned_agent] || { name: t.assigned_agent, emoji: '🤖' };
-  const agentLabel = `${info.emoji} ${info.name}`;
-  const dur = t.status === 'in_progress' && t.created_at
-    ? formatDuration((Date.now() - new Date(t.created_at).getTime()) / 1000)
-    : (t.duration ? formatDuration(t.duration) : '—');
-  const modelStr = t.model || '—';
-  const costStr = t.cost != null && t.cost > 0 ? `$${t.cost.toFixed(4)}` : '—';
-  const tokens = t.tokens ? formatTokens(t.tokens) : '—';
-  const sourceIcon = t.source === 'cron' ? '⏰' : t.source === 'subagent' ? '🔀' : '🎮';
-  const statusColor = t.status === 'in_progress' ? 'var(--accent)' : t.status === 'done' ? 'var(--green)' : t.status === 'review' ? 'var(--orange)' : 'var(--muted)';
   document.getElementById('detailTitle').textContent = t.title;
-  let html = `<div style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:.75rem;font-weight:600;background:${statusColor};color:#000;margin-bottom:12px">${sourceIcon} LIVE · ${t.status.replace('_',' ')}</div>`;
-  html += `<div class="detail-section"><div class="detail-meta">
-    <div class="detail-meta-item"><div class="label">Agent</div><div class="value">${esc(agentLabel)}</div></div>
-    <div class="detail-meta-item"><div class="label">Priority</div><div class="value"><span class="task-priority priority-${t.priority || 'medium'}">${t.priority || 'medium'}</span></div></div>
-    <div class="detail-meta-item"><div class="label">Source</div><div class="value">${sourceIcon} ${t.source || 'manual'}</div></div>
-    <div class="detail-meta-item"><div class="label">Duration</div><div class="value">${dur}</div></div>
-    <div class="detail-meta-item"><div class="label">Model</div><div class="value">${esc(modelStr)}</div></div>
-    <div class="detail-meta-item"><div class="label">Cost</div><div class="value">${costStr}</div></div>
-    <div class="detail-meta-item"><div class="label">Tokens</div><div class="value">${tokens}</div></div>
-    <div class="detail-meta-item"><div class="label">Created</div><div class="value">${t.created_at ? new Date(t.created_at).toLocaleString() : '—'}</div></div>
-    ${t.updated_at ? `<div class="detail-meta-item"><div class="label">Updated</div><div class="value">${new Date(t.updated_at).toLocaleString()}</div></div>` : ''}
-    ${t.completed_at ? `<div class="detail-meta-item"><div class="label">Completed</div><div class="value">${new Date(t.completed_at).toLocaleString()}</div></div>` : ''}
-  </div></div>`;
-  if (t.description) html += `<div class="detail-section"><h3>Description</h3><div class="detail-desc">${esc(t.description)}</div></div>`;
-  if (t.session_key) html += `<div class="detail-section"><h3>Session</h3><div style="font-family:monospace;font-size:.75rem;color:var(--muted);word-break:break-all">${esc(t.session_key)}</div></div>`;
+  let html = buildPremiumModal(t, true);
+  if (t.description) html += `<div class="detail-section" style="margin-top:20px"><h3>Description</h3><div class="detail-desc">${esc(t.description)}</div></div>`;
   document.getElementById('detailBody').innerHTML = html;
   document.getElementById('detailModal').classList.add('open');
 }
