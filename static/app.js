@@ -16,7 +16,7 @@ function updateKanbanFilter(val) {
 }
 document.addEventListener('DOMContentLoaded', () => {
   const sel = document.getElementById('kanbanAgentFilter');
-  if (sel) sel.value = localStorage.getItem('kanbanAgents') || 'main,dev';
+  if (sel) sel.value = localStorage.getItem('kanbanAgents') || 'dev';
 });
 
 // Generate short display ID for tasks (e.g., "#A3F" from UUID)
@@ -156,7 +156,7 @@ async function loadAgentStats() {
 
 async function loadLiveTasks() {
   try {
-    const kanbanAgents = localStorage.getItem('kanbanAgents') || 'main,dev';
+    const kanbanAgents = localStorage.getItem('kanbanAgents') || 'dev';
     const res = await fetch(`${API}/api/live-tasks?agents=${encodeURIComponent(kanbanAgents)}`);
     liveTasks = await res.json();
   } catch(e) { console.error('Failed to load live tasks', e); }

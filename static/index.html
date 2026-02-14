@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="Mission Ctrl">
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-<link rel="stylesheet" href="/static/style.css?v=20260214aa">
+<link rel="stylesheet" href="/static/style.css?v=20260214ab">
 </head>
 <body>
 
@@ -75,7 +75,7 @@
         <button class="tab active" data-tab="board" onclick="switchTab('board')">📋 Board</button>
         <button class="tab" data-tab="activity" onclick="switchTab('activity')">📡 Activity</button>
         <select id="kanbanAgentFilter" onchange="updateKanbanFilter(this.value)" style="margin-left:auto;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:.75rem;cursor:pointer">
-          <option value="main,dev">👤 Mike & Dev</option>
+          <option value="dev">💻 Dev Only</option>
           <option value="all">👥 All Agents</option>
         </select>
       </div>
@@ -327,7 +327,7 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=20260214aa"></script>
+<script src="/static/app.js?v=20260214ab"></script>
 <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js', {scope: '/'});</script>
 </body>
 </html>

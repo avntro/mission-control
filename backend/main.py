@@ -1398,11 +1398,11 @@ def get_agent_stats():
 
 
 @app.get("/api/live-tasks")
-def get_live_tasks(agents: str = "main,dev"):
+def get_live_tasks(agents: str = "dev"):
     """Extract real tasks from agent session files for the kanban board.
     
     Args:
-        agents: Comma-separated list of agent names to include. Default: main,dev.
+        agents: Comma-separated list of agent names to include. Default: dev.
                  Use 'all' to show all agents.
     """
     agents_dir = os.path.join(OPENCLAW_HOME, "agents")
