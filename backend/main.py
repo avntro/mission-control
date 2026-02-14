@@ -1051,6 +1051,7 @@ def openclaw_webhook(event: WebhookEvent):
 MODEL_CONTEXT_LIMITS = {
     "claude-opus-4-6": 1_000_000,
     "claude-sonnet-4.5": 200_000,
+    "claude-sonnet-4-5": 200_000,
     "claude-sonnet-4-20250514": 200_000,
     "claude-3-5-sonnet": 200_000,
 }
@@ -1170,12 +1171,12 @@ def get_agent_stats():
     """Return live token usage and status for all agents from session files."""
     agents_dir = os.path.join(OPENCLAW_HOME, "agents")
     agent_names = {
-        "main": {"display": "Mike", "emoji": "🎯"},
-        "dev": {"display": "Dev", "emoji": "💻"},
-        "trading": {"display": "Trading / AA", "emoji": "📈"},
-        "it-support": {"display": "IT Support", "emoji": "🔧"},
-        "voice": {"display": "Voice", "emoji": "🎙️"},
-        "troubleshoot": {"display": "Troubleshoot", "emoji": "🔍"},
+        "main": {"display": "Mike", "emoji": "🎯", "default_model": "claude-opus-4-6"},
+        "dev": {"display": "Dev", "emoji": "💻", "default_model": "claude-opus-4-6"},
+        "trading": {"display": "Trading / AA", "emoji": "📈", "default_model": "claude-opus-4-6"},
+        "it-support": {"display": "IT Support", "emoji": "🔧", "default_model": "claude-sonnet-4-20250514"},
+        "voice": {"display": "Voice", "emoji": "🎙️", "default_model": "claude-sonnet-4-20250514"},
+        "troubleshoot": {"display": "Troubleshoot", "emoji": "🔍", "default_model": "claude-opus-4-6"},
     }
     result = []
     for name, info in agent_names.items():
@@ -1185,6 +1186,9 @@ def get_agent_stats():
         stats = _parse_session_stats(agent_dir)
         # Strip provider prefix for model lookup (e.g. "anthropic/claude-opus-4-6" -> "claude-opus-4-6")
         model_key = stats["model"].split("/")[-1] if stats["model"] else ""
+        # Fall back to configured default model if no model detected from sessions
+        if not model_key:
+            model_key = info.get("default_model", "")
         ctx_limit = MODEL_CONTEXT_LIMITS.get(model_key, 200_000)
         # Get the main session's tokens for context %
         main_session_tokens = 0
@@ -1202,7 +1206,7 @@ def get_agent_stats():
             "name": name,
             "display_name": info["display"],
             "emoji": info["emoji"],
-            "model": stats["model"],
+            "model": stats["model"] or model_key,
             "active": stats["active"],
             "total_tokens": stats["total_tokens"],
             "main_session_tokens": main_session_tokens,
