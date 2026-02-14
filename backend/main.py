@@ -1884,9 +1884,12 @@ def export_report(report_id: str, format: str = "md"):
         with open(content_path, "r", encoding="utf-8") as f:
             content = f.read()
     conn.close()
+    # Sanitize title for Content-Disposition header (latin-1 safe)
+    safe_title = d["title"].encode("ascii", "ignore").decode("ascii").strip() or "report"
+    safe_title = safe_title.replace('"', "'")[:80]
     if format == "md":
         return Response(content=content, media_type="text/markdown",
-                       headers={"Content-Disposition": f'attachment; filename="{d["title"]}.md"'})
+                       headers={"Content-Disposition": f'attachment; filename="{safe_title}.md"'})
     elif format == "pdf":
         import subprocess, tempfile
         # Write md to temp, convert with nano-pdf
@@ -1895,23 +1898,71 @@ def export_report(report_id: str, format: str = "md"):
             tmp_path = tmp.name
         pdf_path = tmp_path.replace(".md", ".pdf")
         try:
-            nano_pdf = os.path.expanduser("~/.local/bin/nano-pdf")
-            if os.path.exists(nano_pdf):
-                subprocess.run([nano_pdf, tmp_path, pdf_path], timeout=30, check=True)
+            from fpdf import FPDF
+            pdf = FPDF()
+            pdf.set_auto_page_break(auto=True, margin=15)
+            pdf.add_page()
+            # Use DejaVu for Unicode support
+            dejavu = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+            dejavu_b = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+            if os.path.exists(dejavu):
+                pdf.add_font("DejaVu", "", dejavu, uni=True)
+                pdf.add_font("DejaVu", "B", dejavu_b, uni=True)
+                _fn = "DejaVu"
             else:
-                # Fallback: just return the markdown
-                os.unlink(tmp_path)
-                raise HTTPException(501, "PDF converter not available")
-            with open(pdf_path, "rb") as f:
-                pdf_bytes = f.read()
+                _fn = "Helvetica"
+            pdf.set_font(_fn, size=11)
+            import re
+            def _mc(h, txt):
+                """multi_cell wrapper that resets X after each call"""
+                pdf.multi_cell(0, h, txt)
+                pdf.set_x(pdf.l_margin)
+            for line in content.split("\n"):
+                stripped = line.strip()
+                if stripped.startswith("---"):
+                    pdf.ln(4)
+                    continue
+                if stripped.startswith("|"):
+                    # Table row — render as plain text
+                    clean = stripped.replace("|", "  ").strip()
+                    if clean and not all(c in "-– " for c in clean):
+                        _mc(6, clean)
+                    continue
+                try:
+                    if stripped.startswith("### "):
+                        pdf.set_font(_fn, "B", 13)
+                        _mc(8, stripped[4:])
+                        pdf.set_font(_fn, size=11)
+                    elif stripped.startswith("## "):
+                        pdf.set_font(_fn, "B", 15)
+                        _mc(10, stripped[3:])
+                        pdf.set_font(_fn, size=11)
+                    elif stripped.startswith("# "):
+                        pdf.set_font(_fn, "B", 18)
+                        _mc(12, stripped[2:])
+                        pdf.set_font(_fn, size=11)
+                    elif stripped.startswith("- "):
+                        clean = re.sub(r'\*\*(.+?)\*\*', r'\1', stripped[2:])
+                        _mc(6, "  - " + clean)
+                    elif stripped == "":
+                        pdf.ln(4)
+                    else:
+                        clean = re.sub(r'\*\*(.+?)\*\*', r'\1', stripped)
+                        clean = re.sub(r'(\S{60})', r'\1 ', clean)
+                        _mc(6, clean)
+                except Exception:
+                    try:
+                        _mc(6, stripped.encode("ascii", "replace").decode()[:200])
+                    except Exception:
+                        pdf.ln(4)
+            pdf_bytes = pdf.output()
             os.unlink(tmp_path)
-            os.unlink(pdf_path)
-            return Response(content=pdf_bytes, media_type="application/pdf",
-                           headers={"Content-Disposition": f'attachment; filename="{d["title"]}.pdf"'})
-        except subprocess.SubprocessError:
+            return Response(content=bytes(pdf_bytes), media_type="application/pdf",
+                           headers={"Content-Disposition": f'attachment; filename="{safe_title}.pdf"'})
+        except Exception as e:
             if os.path.exists(tmp_path):
                 os.unlink(tmp_path)
-            raise HTTPException(500, "PDF generation failed")
+            raise HTTPException(500, f"PDF generation failed: {str(e)}")
     raise HTTPException(400, "Invalid format. Use 'md' or 'pdf'.")
 
 # Serve report images
