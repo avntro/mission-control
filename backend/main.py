@@ -1241,8 +1241,12 @@ def _parse_session_stats(agent_dir: str) -> Dict[str, Any]:
     for session_key, sess_info in sessions_data.items():
         sid = sess_info.get("sessionId", "")
         updated_at = sess_info.get("updatedAt", 0)
-        # Consider active if updated in last 5 minutes
-        is_active = (now_ms - updated_at) < 300_000
+        # Consider active if updated recently
+        # Sub-agents use a shorter window (2 min) — they finish quickly
+        if ":subagent:" in session_key:
+            is_active = (now_ms - updated_at) < 120_000
+        else:
+            is_active = (now_ms - updated_at) < 300_000
 
         # Find the jsonl file
         jsonl_path = os.path.join(agent_dir, "sessions", f"{sid}.jsonl")

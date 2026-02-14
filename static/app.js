@@ -1459,7 +1459,7 @@ function openAgentSessions(agentName) {
   // Summary
   html += `<div class="subagent-summary">
     <span class="subagent-summary-item"><span class="subagent-dot dot-active"></span>${activeCount} active</span>
-    <span class="subagent-summary-item"><span class="subagent-dot dot-done"></span>${classified.length - activeCount} idle</span>
+    <span class="subagent-summary-item"><span class="subagent-dot dot-done"></span>${classified.length - activeCount} completed</span>
     <span class="subagent-summary-item">📊 ${classified.length} total</span>
     <span class="subagent-summary-item">🔤 ${formatTokens(totalTokens)}</span>
     <span class="subagent-summary-item">💰 $${totalCost.toFixed(2)}</span>
@@ -1472,7 +1472,7 @@ function openAgentSessions(agentName) {
     for (const s of classified) {
       const statusClass = s.active ? 'running' : 'done';
       const statusIcon = s.active ? '🔄' : '✅';
-      const statusLabel = s.active ? 'Active' : 'Idle';
+      const statusLabel = s.active ? 'Active' : (s.isSubagent ? 'Completed' : 'Idle');
       const modelStr = s.model ? s.model.replace('anthropic/', '').replace('claude-', 'c-') : '—';
       const costStr = s.cost > 0 ? `$${s.cost.toFixed(2)}` : '—';
       const tokStr = s.tokens ? formatTokens(s.tokens) : '—';
