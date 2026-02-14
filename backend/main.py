@@ -1345,9 +1345,16 @@ def get_live_tasks():
             if not os.path.exists(jsonl_path):
                 continue
 
-            # Determine status
+            # Determine status — use BOTH sessions.json updatedAt AND jsonl file mtime
+            # sessions.json updatedAt can be stale while the session is still actively writing
             age_ms = now_ms - updated_at
-            is_active = age_ms < 60_000
+            try:
+                file_mtime_ms = os.path.getmtime(jsonl_path) * 1000
+                file_age_ms = now_ms - file_mtime_ms
+            except OSError:
+                file_age_ms = age_ms
+            # Session is active if EITHER indicator shows recent activity (within 2 min)
+            is_active = min(age_ms, file_age_ms) < 120_000
 
             # Read first user message for task title and session start time
             title = ""
