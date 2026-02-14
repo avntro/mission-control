@@ -238,7 +238,7 @@ async function drop(e) {
   e.preventDefault(); e.currentTarget.classList.remove('drag-over');
   const col = e.currentTarget.id.replace('col-', '');
   if (!draggedTaskId) return;
-  try { await fetch(`${API}/api/tasks/${draggedTaskId}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status:col}) }); await loadTasks(); } catch(e) { console.error(e); }
+  try { await fetch(`${API}/api/tasks/${draggedTaskId}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status:col}) }); await loadTasks(); renderBoard(); } catch(e) { console.error(e); }
   draggedTaskId = null;
 }
 
@@ -549,8 +549,8 @@ function openLiveDetail(id) {
   document.getElementById('detailBody').innerHTML = html;
   document.getElementById('detailModal').classList.add('open');
 }
-async function moveTask(id, status) { await fetch(`${API}/api/tasks/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status}) }); closeDetail(); await loadTasks(); }
-async function deleteTask(id) { if (!confirm('Delete this task?')) return; await fetch(`${API}/api/tasks/${id}`, { method:'DELETE' }); closeDetail(); await loadTasks(); }
+async function moveTask(id, status) { await fetch(`${API}/api/tasks/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status}) }); closeDetail(); await loadTasks(); renderBoard(); }
+async function deleteTask(id) { if (!confirm('Delete this task?')) return; await fetch(`${API}/api/tasks/${id}`, { method:'DELETE' }); closeDetail(); await loadTasks(); renderBoard(); }
 async function addComment(taskId) { const text = document.getElementById('commentText').value.trim(); if (!text) return; await fetch(`${API}/api/comments`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({task_id:taskId,content:text,agent:'',type:'comment'}) }); openDetail(taskId); }
 
 function openCreateModal() { document.getElementById('createModal').classList.add('open'); }
@@ -560,7 +560,7 @@ async function createTask(e) {
   e.preventDefault();
   const data = { title: document.getElementById('newTitle').value, description: document.getElementById('newDesc').value, assigned_agent: document.getElementById('newAgent').value, priority: document.getElementById('newPriority').value, status: 'todo' };
   await fetch(`${API}/api/tasks`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
-  closeCreate(); document.getElementById('newTitle').value = ''; document.getElementById('newDesc').value = ''; await loadTasks();
+  closeCreate(); document.getElementById('newTitle').value = ''; document.getElementById('newDesc').value = ''; await loadTasks(); renderBoard();
 }
 
 // ══════════════════════════════════════════════════════════════
