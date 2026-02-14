@@ -38,6 +38,15 @@ class CommentCreate(BaseModel):
     content: str = ""
     type: str = "comment"
 
+class AttachmentCreate(BaseModel):
+    task_id: str
+    filename: str
+    mime_type: str = "image/png"
+    url: str = ""
+    thumbnail_url: str = ""
+    size_bytes: int = 0
+    uploaded_by: str = ""
+
 class AgentUpdate(BaseModel):
     status: Optional[str] = None
     last_activity: Optional[str] = None
@@ -161,6 +170,18 @@ def init_db():
         standup_id TEXT DEFAULT '',
         created_at TEXT NOT NULL,
         completed_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS attachments (
+        id TEXT PRIMARY KEY,
+        task_id TEXT NOT NULL,
+        filename TEXT NOT NULL,
+        mime_type TEXT DEFAULT 'image/png',
+        url TEXT DEFAULT '',
+        thumbnail_url TEXT DEFAULT '',
+        size_bytes INTEGER DEFAULT 0,
+        uploaded_by TEXT DEFAULT '',
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
     );
     """)
     # Seed agents if empty
@@ -328,6 +349,8 @@ def get_task(task_id: str):
         "SELECT * FROM activity_feed WHERE task_id = ? ORDER BY created_at ASC", (task_id,)
     ).fetchall()
     task["history"] = [dict(h) for h in history]
+    attachments = conn.execute("SELECT * FROM attachments WHERE task_id = ? ORDER BY created_at ASC", (task_id,)).fetchall()
+    task["attachments"] = [dict(a) for a in attachments]
     conn.close()
     return task
 
@@ -406,6 +429,34 @@ def create_comment(c: CommentCreate):
     conn.commit()
     conn.close()
     return {"id": cid}
+
+# ── Attachments ─────────────────────────────────────────────────
+@app.get("/api/tasks/{task_id}/attachments")
+def list_attachments(task_id: str):
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM attachments WHERE task_id = ? ORDER BY created_at ASC", (task_id,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+@app.post("/api/tasks/{task_id}/attachments")
+def add_attachment(task_id: str, a: AttachmentCreate):
+    conn = get_db()
+    aid = str(uuid.uuid4())[:8]
+    conn.execute(
+        "INSERT INTO attachments (id, task_id, filename, mime_type, url, thumbnail_url, size_bytes, uploaded_by, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        (aid, task_id, a.filename, a.mime_type, a.url, a.thumbnail_url or a.url, a.size_bytes, a.uploaded_by, now_iso())
+    )
+    conn.commit()
+    conn.close()
+    return {"id": aid}
+
+@app.delete("/api/attachments/{attachment_id}")
+def delete_attachment(attachment_id: str):
+    conn = get_db()
+    conn.execute("DELETE FROM attachments WHERE id = ?", (attachment_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
 
 # ── Agents ──────────────────────────────────────────────────────
 @app.get("/api/agents")

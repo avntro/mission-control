@@ -372,6 +372,7 @@ async function openDetail(id) {
     html += buildPremiumModal(t, false);
 
     if (t.description) html += `<div class="detail-section" style="margin-top:20px"><h3>Description</h3><div class="detail-desc">${esc(t.description)}</div></div>`;
+    html += renderAttachmentsSection(t);
     if (t.comments && t.comments.length) {
       html += `<div class="detail-section"><h3>Comments & Logs (${t.comments.length})</h3>`;
       t.comments.forEach(c => { const cA = agents.find(a => a.name === c.agent); const cN = cA ? cA.display_name : (c.agent || 'System'); html += `<div class="comment-item type-${c.type}"><div class="comment-header"><span>${esc(cN)} · ${c.type}</span><span>${timeAgo(c.created_at)}</span></div><div class="comment-content">${esc(c.content)}</div></div>`; });
@@ -386,6 +387,67 @@ async function openDetail(id) {
     document.getElementById('detailBody').innerHTML = html;
     document.getElementById('detailModal').classList.add('open');
   } catch(e) { console.error(e); }
+}
+
+// ── Attachments UI ─────────────────────────────────────────────
+function renderAttachmentsSection(t) {
+  const attachments = t.attachments || [];
+  // Also extract image URLs from description
+  const descImages = [];
+  if (t.description) {
+    const urlRe = /https?:\/\/[^\s"'<>]+\.(?:png|jpg|jpeg|gif|webp|svg)(?:\?[^\s"'<>]*)?/gi;
+    let m; while ((m = urlRe.exec(t.description)) !== null) descImages.push(m[0]);
+  }
+  const allImages = [...attachments.map(a => ({ url: a.url, thumb: a.thumbnail_url || a.url, name: a.filename, id: a.id })), ...descImages.map(u => ({ url: u, thumb: u, name: u.split('/').pop().split('?')[0], id: null }))];
+
+  let html = `<div class="detail-section" style="margin-top:20px"><h3>📎 Attachments${allImages.length ? ` (${allImages.length})` : ''}</h3>`;
+  if (allImages.length) {
+    html += '<div class="attachments-grid">';
+    allImages.forEach(img => {
+      html += `<div class="attachment-thumb" onclick="openLightbox('${esc(img.url)}')">
+        <img src="${esc(img.thumb)}" alt="${esc(img.name)}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'attachment-broken\\'>🖼️<br>${esc(img.name)}</div>'">
+        <div class="attachment-name">${esc(img.name)}</div>
+      </div>`;
+    });
+    html += '</div>';
+  } else {
+    html += '<div style="color:var(--muted);font-size:.83rem;padding:8px 0">No attachments yet</div>';
+  }
+  // Upload hint (for future use)
+  if (t.id && !t.is_live) {
+    html += `<div style="margin-top:8px"><button class="btn btn-sm" onclick="promptAttachmentUrl('${t.id}')">➕ Add Image URL</button></div>`;
+  }
+  html += '</div>';
+  return html;
+}
+
+function promptAttachmentUrl(taskId) {
+  const url = prompt('Enter image URL:');
+  if (!url) return;
+  const filename = url.split('/').pop().split('?')[0] || 'image.png';
+  fetch(`${API}/api/tasks/${taskId}/attachments`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ task_id: taskId, filename, url, mime_type: 'image/png', uploaded_by: 'user' })
+  }).then(() => openDetail(taskId)).catch(console.error);
+}
+
+function openLightbox(url) {
+  let lb = document.getElementById('lightbox');
+  if (!lb) {
+    lb = document.createElement('div');
+    lb.id = 'lightbox';
+    lb.className = 'lightbox-overlay';
+    lb.onclick = closeLightbox;
+    lb.innerHTML = '<div class="lightbox-content" onclick="event.stopPropagation()"><img id="lightboxImg" src=""><button class="lightbox-close" onclick="closeLightbox()">✕</button></div>';
+    document.body.appendChild(lb);
+  }
+  document.getElementById('lightboxImg').src = url;
+  lb.classList.add('open');
+}
+
+function closeLightbox() {
+  const lb = document.getElementById('lightbox');
+  if (lb) lb.classList.remove('open');
 }
 
 function closeDetail() { document.getElementById('detailModal').classList.remove('open'); }
@@ -404,6 +466,7 @@ function openLiveDetail(id) {
   html += buildPremiumModal(t, true);
 
   if (t.description) html += `<div class="detail-section" style="margin-top:20px"><h3>Description</h3><div class="detail-desc">${esc(t.description)}</div></div>`;
+  html += renderAttachmentsSection(t);
 
   // Live task info section (since live tasks don't have comments/history)
   html += `<div class="detail-section" style="margin-top:20px"><h3>Live Session Info</h3><div style="font-size:.83rem;color:var(--muted);line-height:1.6">

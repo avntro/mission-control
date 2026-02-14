@@ -440,3 +440,19 @@ body{
 .log-fail-badge{font-size:.55rem;font-weight:700;color:var(--red);background:rgba(255,82,82,.15);padding:1px 5px;border-radius:3px;margin-left:6px}
 
 .live-source-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:8px;font-size:.78rem;font-weight:600;background:rgba(0,188,212,0.1);color:var(--accent);border:1px solid rgba(0,188,212,0.2)}
+
+/* Attachments */
+.attachments-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:8px}
+.attachment-thumb{position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--border);cursor:pointer;transition:border-color .2s,transform .15s;aspect-ratio:1;background:var(--card)}
+.attachment-thumb:hover{border-color:var(--accent);transform:scale(1.03)}
+.attachment-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.attachment-name{position:absolute;bottom:0;left:0;right:0;padding:4px 6px;font-size:.6rem;background:linear-gradient(transparent,rgba(0,0,0,.8));color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.attachment-broken{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;font-size:.7rem;color:var(--muted);text-align:center;padding:8px}
+
+/* Lightbox */
+.lightbox-overlay{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.92);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+.lightbox-overlay.open{opacity:1;pointer-events:auto}
+.lightbox-content{position:relative;max-width:92vw;max-height:92vh}
+.lightbox-content img{max-width:92vw;max-height:88vh;object-fit:contain;border-radius:8px;box-shadow:0 0 60px rgba(0,188,212,.15)}
+.lightbox-close{position:absolute;top:-12px;right:-12px;width:32px;height:32px;border-radius:50%;border:none;background:var(--card);color:var(--text);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.4)}
+.lightbox-close:hover{background:var(--red);color:#fff}
