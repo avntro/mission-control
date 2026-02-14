@@ -21,6 +21,9 @@ const AGENT_INFO = {
   dev: { name: 'Dev', emoji: '💻', color: '#00bcd4' },
   voice: { name: 'Voice', emoji: '🎙️', color: '#e040fb' },
   troubleshoot: { name: 'Troubleshoot', emoji: '🔍', color: '#ff5252' },
+  docs: { name: 'Docs', emoji: '📚', color: '#7c4dff' },
+  researcher: { name: 'Researcher', emoji: '🔬', color: '#64ffda' },
+  security: { name: 'Security', emoji: '🛡️', color: '#ffd740' },
 };
 
 // ── Init ───────────────────────────────────────────────────────
@@ -586,6 +589,9 @@ function renderOrgChart() {
     { id:'dev', name:'Dev', role:'Software Development', emoji:'💻', model:'anthropic/claude-opus-4-6' },
     { id:'voice', name:'Voice', role:'Voice Assistant', emoji:'🎙️', model:'anthropic/claude-sonnet-4-20250514' },
     { id:'troubleshoot', name:'Troubleshoot', role:'Troubleshooting', emoji:'🔍', model:'anthropic/claude-opus-4-6' },
+    { id:'docs', name:'Docs', role:'Documentation & Knowledge', emoji:'📚', model:'anthropic/claude-sonnet-4-20250514' },
+    { id:'researcher', name:'Researcher', role:'Discovery & Proposals', emoji:'🔬', model:'anthropic/claude-sonnet-4-20250514' },
+    { id:'security', name:'Security', role:'Security & Auditing', emoji:'🛡️', model:'anthropic/claude-sonnet-4-20250514' },
   ];
   const collapsed = orgExpanded ? '' : 'collapsed';
   tree.innerHTML = `
