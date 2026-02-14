@@ -151,7 +151,7 @@ function liveTaskCardHTML(t) {
   const costStr = t.cost != null && t.cost > 0 ? `$${t.cost.toFixed(2)}` : '—';
   const timeRef = (t.status === 'done' || t.status === 'review') ? (t.completed_at || t.updated_at || t.created_at) : t.created_at;
   const timeLabel = (t.status === 'done' || t.status === 'review') ? 'completed ' : '';
-  return `<div class="task-card live-task${activePulse}" data-id="${t.id}">
+  return `<div class="task-card live-task${activePulse}" data-id="${t.id}" onclick="openLiveDetail('${t.id}')">
     <div class="task-live-badge">${sourceIcon} LIVE</div>
     <div class="task-title">${esc(t.title)}</div>
     <div class="task-meta">
@@ -296,6 +296,32 @@ async function openDetail(id) {
 
 function closeDetail() { document.getElementById('detailModal').classList.remove('open'); }
 function closeDetailIfOutside(e) { if (e.target === e.currentTarget) closeDetail(); }
+
+function openLiveDetail(id) {
+  const t = liveTasks.find(lt => lt.id === id);
+  if (!t) return;
+  const info = AGENT_INFO[t.assigned_agent] || { name: t.assigned_agent, emoji: '🤖' };
+  const agentLabel = `${info.emoji} ${info.name}`;
+  const dur = t.duration ? formatDuration(t.duration) : (t.created_at ? formatDuration((Date.now() - new Date(t.created_at).getTime()) / 1000) : '—');
+  const modelStr = t.model || '—';
+  const costStr = t.cost != null && t.cost > 0 ? `$${t.cost.toFixed(2)}` : '—';
+  const tokens = t.tokens ? formatTokens(t.tokens) : '—';
+  const sourceIcon = t.source === 'cron' ? '⏰' : t.source === 'subagent' ? '🔀' : '🎮';
+  document.getElementById('detailTitle').textContent = t.title;
+  let html = `<div class="detail-section"><div class="detail-meta">
+    <div class="detail-meta-item"><div class="label">Agent</div><div class="value">${esc(agentLabel)}</div></div>
+    <div class="detail-meta-item"><div class="label">Status</div><div class="value"><span class="task-priority priority-medium">${t.status.replace('_',' ')}</span></div></div>
+    <div class="detail-meta-item"><div class="label">Source</div><div class="value">${sourceIcon} ${t.source || 'manual'}</div></div>
+    <div class="detail-meta-item"><div class="label">Duration</div><div class="value">${dur}</div></div>
+    <div class="detail-meta-item"><div class="label">Model</div><div class="value">${esc(modelStr)}</div></div>
+    <div class="detail-meta-item"><div class="label">Cost</div><div class="value">${costStr}</div></div>
+    <div class="detail-meta-item"><div class="label">Tokens</div><div class="value">${tokens}</div></div>
+    <div class="detail-meta-item"><div class="label">Created</div><div class="value">${t.created_at ? new Date(t.created_at).toLocaleString() : '—'}</div></div>
+  </div></div>`;
+  if (t.description) html += `<div class="detail-section"><h3>Description</h3><div class="detail-desc">${esc(t.description)}</div></div>`;
+  document.getElementById('detailBody').innerHTML = html;
+  document.getElementById('detailModal').classList.add('open');
+}
 async function moveTask(id, status) { await fetch(`${API}/api/tasks/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status}) }); closeDetail(); await loadTasks(); }
 async function deleteTask(id) { if (!confirm('Delete this task?')) return; await fetch(`${API}/api/tasks/${id}`, { method:'DELETE' }); closeDetail(); await loadTasks(); }
 async function addComment(taskId) { const text = document.getElementById('commentText').value.trim(); if (!text) return; await fetch(`${API}/api/comments`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({task_id:taskId,content:text,agent:'',type:'comment'}) }); openDetail(taskId); }
