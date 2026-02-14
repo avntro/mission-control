@@ -1959,6 +1959,41 @@ def export_report(report_id: str, format: str = "md"):
                         _mc(6, stripped.encode("ascii", "replace").decode()[:200])
                     except Exception:
                         pdf.ln(4)
+            # --- Embed report screenshots/images ---
+            screenshots = json.loads(d.get("screenshots", "[]"))
+            if screenshots:
+                pdf.add_page()
+                pdf.set_font(_fn, "B", 15)
+                _mc(10, "Screenshots & Charts")
+                pdf.set_font(_fn, size=11)
+                pdf.ln(4)
+                for img_url in screenshots:
+                    # img_url is like /reports/images/filename.jpg
+                    img_filename = os.path.basename(img_url)
+                    img_path = os.path.join(REPORTS_IMAGES_DIR, img_filename)
+                    if not os.path.exists(img_path):
+                        continue
+                    try:
+                        # Check if we need a new page (leave 60mm margin)
+                        if pdf.get_y() > pdf.h - 80:
+                            pdf.add_page()
+                        # Caption
+                        caption = img_filename.replace(".jpg", "").replace("_", " ").title()
+                        pdf.set_font(_fn, "B", 10)
+                        _mc(6, caption)
+                        pdf.set_font(_fn, size=11)
+                        # Insert image - fit to page width with some margin
+                        img_w = pdf.w - pdf.l_margin - pdf.r_margin
+                        pdf.image(img_path, x=pdf.l_margin, y=pdf.get_y(), w=img_w)
+                        # Move Y down based on image aspect ratio
+                        from PIL import Image as PILImage
+                        with PILImage.open(img_path) as pimg:
+                            iw, ih = pimg.size
+                        img_h = img_w * (ih / iw)
+                        pdf.set_y(pdf.get_y() + img_h + 6)
+                    except Exception:
+                        pass  # skip broken images
+
             pdf_bytes = pdf.output()
             os.unlink(tmp_path)
             return Response(content=bytes(pdf_bytes), media_type="application/pdf",
