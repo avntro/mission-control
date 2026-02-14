@@ -704,6 +704,87 @@ function searchDocs() {
 }
 
 // ══════════════════════════════════════════════════════════════
+// SYSTEM STATS
+// ══════════════════════════════════════════════════════════════
+
+async function loadSystemStats() {
+  try {
+    const res = await fetch(`${API}/api/system`);
+    if (!res.ok) throw new Error('System stats unavailable');
+    const s = await res.json();
+    renderSystemWidget(s);
+  } catch(e) { document.getElementById('systemWidget').innerHTML = '<div class="gpu-loading">System stats offline</div>'; }
+}
+
+function formatBytes(bytes) {
+  if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + ' GB/s';
+  if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB/s';
+  if (bytes >= 1024) return (bytes / 1024).toFixed(1) + ' KB/s';
+  return bytes + ' B/s';
+}
+
+function formatKB(kb) {
+  if (kb >= 1048576) return (kb / 1048576).toFixed(1) + ' GB';
+  if (kb >= 1024) return (kb / 1024).toFixed(1) + ' MB';
+  return kb + ' KB';
+}
+
+function formatUptime(secs) {
+  const d = Math.floor(secs / 86400);
+  const h = Math.floor((secs % 86400) / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function renderSystemWidget(s) {
+  const el = document.getElementById('systemWidget');
+  if (!el) return;
+  const cpu = s.cpu || {};
+  const ram = s.ram || {};
+  const swap = s.swap || {};
+  const disk = s.disk || {};
+  const net = s.network || {};
+
+  const cpuColor = cpu.usage_pct >= 90 ? 'red' : cpu.usage_pct >= 70 ? 'yellow' : 'green';
+  const cpuBarColor = cpuColor === 'red' ? 'var(--red)' : cpuColor === 'yellow' ? 'var(--orange)' : 'var(--green)';
+
+  const ramPct = ram.total_kb ? Math.round(ram.used_kb / ram.total_kb * 100) : 0;
+  const ramColor = ramPct >= 90 ? 'red' : ramPct >= 70 ? 'yellow' : 'green';
+  const ramBarColor = ramColor === 'red' ? 'var(--red)' : ramColor === 'yellow' ? 'var(--orange)' : 'var(--green)';
+
+  const swapPct = swap.total_kb ? Math.round(swap.used_kb / swap.total_kb * 100) : 0;
+  const swapColor = swapPct >= 80 ? 'red' : swapPct >= 50 ? 'yellow' : 'green';
+  const swapBarColor = swapColor === 'red' ? 'var(--red)' : swapColor === 'yellow' ? 'var(--orange)' : 'var(--green)';
+
+  const diskColor = disk.usage_pct >= 90 ? 'red' : disk.usage_pct >= 80 ? 'yellow' : 'green';
+  const diskBarColor = diskColor === 'red' ? 'var(--red)' : diskColor === 'yellow' ? 'var(--orange)' : 'var(--green)';
+
+  let netHtml = '';
+  for (const [iface, data] of Object.entries(net)) {
+    const label = iface === 'eno1' ? 'LAN' : iface === 'tailscale0' ? 'Tailscale' : iface;
+    netHtml += `<div class="gpu-row"><span class="gpu-label">${label}</span><span class="gpu-value" style="font-size:.68rem">↓${formatBytes(data.rx_bytes_sec)} ↑${formatBytes(data.tx_bytes_sec)}</span></div>`;
+  }
+
+  el.innerHTML = `
+    <div class="gpu-row"><span class="gpu-label">CPU (${cpu.cores} cores)</span><span class="gpu-value gpu-indicator-${cpuColor}">${cpu.usage_pct}%</span></div>
+    <div class="gpu-bar-wrap"><div class="gpu-bar" style="width:${cpu.usage_pct}%;background:${cpuBarColor}"></div></div>
+    <div class="gpu-row" style="margin-top:2px"><span class="gpu-label" style="font-size:.68rem">Load</span><span class="gpu-value" style="font-size:.68rem">${cpu.load_1} / ${cpu.load_5} / ${cpu.load_15}</span></div>
+    <div class="gpu-row" style="margin-top:8px"><span class="gpu-label">RAM</span><span class="gpu-value gpu-indicator-${ramColor}">${formatKB(ram.used_kb)} / ${formatKB(ram.total_kb)}</span></div>
+    <div class="gpu-bar-wrap"><div class="gpu-bar" style="width:${ramPct}%;background:${ramBarColor}"></div></div>
+    <div class="gpu-row" style="margin-top:4px"><span class="gpu-label">Swap</span><span class="gpu-value gpu-indicator-${swapColor}">${formatKB(swap.used_kb)} / ${formatKB(swap.total_kb)}</span></div>
+    <div class="gpu-bar-wrap"><div class="gpu-bar" style="width:${swapPct}%;background:${swapBarColor}"></div></div>
+    <div class="gpu-row" style="margin-top:8px"><span class="gpu-label">Disk /</span><span class="gpu-value gpu-indicator-${diskColor}">${disk.used_gb}G / ${disk.total_gb}G (${disk.usage_pct}%)</span></div>
+    <div class="gpu-bar-wrap"><div class="gpu-bar" style="width:${disk.usage_pct}%;background:${diskBarColor}"></div></div>
+    ${netHtml ? '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px">' + netHtml + '</div>' : ''}
+    <div class="gpu-row" style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px"><span class="gpu-label">Uptime</span><span class="gpu-value">${formatUptime(s.uptime_secs)}</span></div>`;
+}
+
+setInterval(loadSystemStats, 5000);
+document.addEventListener('DOMContentLoaded', () => setTimeout(loadSystemStats, 300));
+
+// ══════════════════════════════════════════════════════════════
 // GPU STATS
 // ══════════════════════════════════════════════════════════════
 const gpuHistory = [];
