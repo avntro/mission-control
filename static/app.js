@@ -24,6 +24,36 @@ function rebuildAgentInfo() {
     info[a.name] = { name: a.display_name || a.name, emoji: a.emoji || '🤖', color: AGENT_COLOR_MAP[a.name] || AGENT_COLOR_POOL[ci++ % AGENT_COLOR_POOL.length] };
   }
   AGENT_INFO = info;
+  populateAgentSelects();
+}
+
+function populateAgentSelects() {
+  // Activity filter
+  const af = document.getElementById('activityFilter');
+  if (af) {
+    const val = af.value;
+    af.innerHTML = '<option value="">All Agents</option>' + agents.map(a => `<option value="${a.name}">${a.emoji} ${a.display_name}</option>`).join('');
+    af.value = val;
+  }
+  // Create task agent select
+  const na = document.getElementById('newAgent');
+  if (na) {
+    const val = na.value;
+    na.innerHTML = '<option value="">Unassigned</option>' + agents.map(a => `<option value="${a.name}">${a.emoji} ${a.display_name}</option>`).join('');
+    na.value = val;
+  }
+  // Action item assignee
+  const aa = document.getElementById('actionAssignee');
+  if (aa) {
+    const val = aa.value;
+    aa.innerHTML = '<option value="">Unassigned</option>' + agents.map(a => `<option value="${a.name}">${a.emoji} ${a.display_name}</option>`).join('');
+    aa.value = val;
+  }
+  // Standup participants checkboxes
+  const sp = document.getElementById('standupParticipants');
+  if (sp && sp.children.length !== agents.length) {
+    sp.innerHTML = agents.map(a => `<label class="cb-label"><input type="checkbox" value="${a.name}"${a.name === 'main' ? ' checked' : ''}> ${a.emoji} ${a.display_name}</label>`).join('');
+  }
 }
 
 // ── Init ───────────────────────────────────────────────────────

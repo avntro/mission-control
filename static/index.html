@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mission Control — OpenClaw</title>
 <meta name="theme-color" content="#1a1a1a">
-<link rel="stylesheet" href="/static/style.css?v=20260214i">
+<link rel="stylesheet" href="/static/style.css?v=20260214j">
 </head>
 <body>
 
@@ -86,12 +86,6 @@
         <div class="activity-header">
           <select id="activityFilter" onchange="loadActivity()">
             <option value="">All Agents</option>
-            <option value="main">Mike</option>
-            <option value="trading">Trading / AA</option>
-            <option value="it-support">IT Support</option>
-            <option value="dev">Dev</option>
-            <option value="voice">Voice</option>
-            <option value="troubleshoot">Troubleshoot</option>
           </select>
         </div>
         <div id="activityFeed"></div>
@@ -229,7 +223,7 @@
       <label>Title *</label><input type="text" id="newTitle" required placeholder="Task title...">
       <label>Description</label><textarea id="newDesc" rows="3" placeholder="Details..."></textarea>
       <label>Assign to Agent</label>
-      <select id="newAgent"><option value="">Unassigned</option><option value="main">Mike</option><option value="trading">Trading / AA</option><option value="it-support">IT Support</option><option value="dev">Dev</option><option value="voice">Voice</option><option value="troubleshoot">Troubleshoot</option></select>
+      <select id="newAgent"><option value="">Unassigned</option></select>
       <label>Priority</label>
       <select id="newPriority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="critical">Critical</option></select>
       <div class="form-actions"><button type="button" class="btn" onclick="closeCreate()">Cancel</button><button type="submit" class="btn btn-primary">Create Task</button></div>
@@ -244,14 +238,7 @@
     <form class="modal-body" onsubmit="createStandup(event)">
       <label>Title *</label><input type="text" id="standupTitle" required placeholder="Standup topic...">
       <label>Participants</label>
-      <div class="checkbox-group">
-        <label class="cb-label"><input type="checkbox" value="main" checked> 🎯 Mike</label>
-        <label class="cb-label"><input type="checkbox" value="trading"> 📈 Trading / AA</label>
-        <label class="cb-label"><input type="checkbox" value="it-support"> 🔧 IT Support</label>
-        <label class="cb-label"><input type="checkbox" value="dev"> 💻 Dev</label>
-        <label class="cb-label"><input type="checkbox" value="voice"> 🎙️ Voice</label>
-        <label class="cb-label"><input type="checkbox" value="troubleshoot"> 🔍 Troubleshoot</label>
-      </div>
+      <div class="checkbox-group" id="standupParticipants"></div>
       <div class="form-actions"><button type="button" class="btn" onclick="document.getElementById('standupModal').classList.remove('open')">Cancel</button><button type="submit" class="btn btn-primary">Create Standup</button></div>
     </form>
   </div>
@@ -264,12 +251,12 @@
     <form class="modal-body" onsubmit="createActionItem(event)">
       <label>Action Item *</label><input type="text" id="actionText" required placeholder="What needs to be done...">
       <label>Assign to</label>
-      <select id="actionAssignee"><option value="">Unassigned</option><option value="main">Mike</option><option value="trading">Trading / AA</option><option value="it-support">IT Support</option><option value="dev">Dev</option><option value="voice">Voice</option><option value="troubleshoot">Troubleshoot</option></select>
+      <select id="actionAssignee"><option value="">Unassigned</option></select>
       <div class="form-actions"><button type="button" class="btn" onclick="document.getElementById('actionModal').classList.remove('open')">Cancel</button><button type="submit" class="btn btn-primary">Create</button></div>
     </form>
   </div>
 </div>
 
-<script src="/static/app.js?v=20260214i"></script>
+<script src="/static/app.js?v=20260214j"></script>
 </body>
 </html>

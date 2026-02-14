@@ -1434,6 +1434,9 @@ def get_live_tasks():
             # Determine source type
             source = "subagent" if is_subagent else "cron" if is_cron else "control"
 
+            updated_iso = datetime.fromtimestamp(updated_at / 1000, tz=timezone.utc).isoformat() if updated_at else ""
+            completed_at = updated_iso if status in ("review", "done") else None
+
             tasks_list.append({
                 "id": f"live-{sid[:8]}",
                 "title": clean_title,
@@ -1446,7 +1449,8 @@ def get_live_tasks():
                 "cost": round(cost, 4),
                 "model": model,
                 "created_at": started_at,
-                "updated_at": datetime.fromtimestamp(updated_at / 1000, tz=timezone.utc).isoformat() if updated_at else "",
+                "updated_at": updated_iso,
+                "completed_at": completed_at,
                 "duration": duration,
                 "is_live": True,
             })
