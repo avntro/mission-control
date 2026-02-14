@@ -53,7 +53,15 @@ async function loadAll() {
 }
 
 async function loadAgentStats() {
-  try { const res = await fetch(`${API}/api/agent-stats`); agentStats = await res.json(); if (currentPage === 'dashboard') renderAgents(); if (currentPage === 'taskmanager') loadTaskManager(); } catch(e) { console.error('Failed to load agent stats', e); }
+  try {
+    const res = await fetch(`${API}/api/agent-stats`);
+    const data = await res.json();
+    const json = JSON.stringify(data);
+    const changed = json !== _lastAgentStatsJSON;
+    if (changed) { _lastAgentStatsJSON = json; agentStats = data; }
+    if (changed && currentPage === 'dashboard') renderAgents();
+    if (currentPage === 'taskmanager') loadTaskManager();
+  } catch(e) { console.error('Failed to load agent stats', e); }
 }
 
 async function loadLiveTasks() {
@@ -200,8 +208,16 @@ async function drop(e) {
   draggedTaskId = null;
 }
 
+let _lastAgentsJSON = '';
+let _lastAgentsStableHTML = '';
+let _lastAgentStatsJSON = '';
 async function loadAgents() {
-  try { const res = await fetch(`${API}/api/agents`); agents = await res.json(); renderAgents(); } catch(e) { console.error('Failed to load agents', e); }
+  try {
+    const res = await fetch(`${API}/api/agents`);
+    const data = await res.json();
+    const json = JSON.stringify(data);
+    if (json !== _lastAgentsJSON) { _lastAgentsJSON = json; agents = data; renderAgents(); }
+  } catch(e) { console.error('Failed to load agents', e); }
 }
 
 function renderAgents() {
@@ -210,7 +226,7 @@ function renderAgents() {
   const activeCount = agentStats.filter(s => s.active).length;
   const statusEl = document.getElementById('navStatus');
   if (statusEl) statusEl.textContent = `${agents.length} agents · ${activeCount} active`;
-  el.innerHTML = agents.map(a => {
+  const newHTML = agents.map(a => {
     const stats = agentStats.find(s => s.name === a.name);
     const isActive = stats ? stats.active : a.status === 'busy';
     const statusLabel = isActive ? 'active' : 'idle';
@@ -227,9 +243,15 @@ function renderAgents() {
       <div class="agent-token-row"><span class="agent-token-label">Context</span><span class="agent-token-value">${tokenStr}</span></div>
       <div class="agent-ctx-bar"><div class="agent-ctx-fill" style="width:${Math.min(ctxPct,100)}%;background:${ctxBarColor}"></div></div>
       <div class="agent-meta-model">🧠 ${esc(modelStr)}</div>
-      <div class="agent-meta"><span>💰 ${costStr}</span><span ${a.last_activity ? `data-time-ago="${a.last_activity}"` : ''}>🕐 ${lastAct}</span></div>
+      <div class="agent-meta"><span>💰 ${costStr}</span><span ${a.last_activity ? `data-time-ago="${a.last_activity}" data-time-prefix="🕐 "` : ''}>🕐 ${lastAct}</span></div>
     </div>`;
   }).join('');
+  // Only replace DOM when structural data changes (not just time-ago text)
+  const stableHTML = newHTML.replace(/>\u{1F550} [^<]*/gu, '>\u{1F550}');
+  if (stableHTML !== _lastAgentsStableHTML) {
+    el.innerHTML = newHTML;
+    _lastAgentsStableHTML = stableHTML;
+  }
 }
 
 function formatTokens(n) {
@@ -302,23 +324,30 @@ function openLiveDetail(id) {
   if (!t) return;
   const info = AGENT_INFO[t.assigned_agent] || { name: t.assigned_agent, emoji: '🤖' };
   const agentLabel = `${info.emoji} ${info.name}`;
-  const dur = t.duration ? formatDuration(t.duration) : (t.created_at ? formatDuration((Date.now() - new Date(t.created_at).getTime()) / 1000) : '—');
+  const dur = t.status === 'in_progress' && t.created_at
+    ? formatDuration((Date.now() - new Date(t.created_at).getTime()) / 1000)
+    : (t.duration ? formatDuration(t.duration) : '—');
   const modelStr = t.model || '—';
-  const costStr = t.cost != null && t.cost > 0 ? `$${t.cost.toFixed(2)}` : '—';
+  const costStr = t.cost != null && t.cost > 0 ? `$${t.cost.toFixed(4)}` : '—';
   const tokens = t.tokens ? formatTokens(t.tokens) : '—';
   const sourceIcon = t.source === 'cron' ? '⏰' : t.source === 'subagent' ? '🔀' : '🎮';
+  const statusColor = t.status === 'in_progress' ? 'var(--accent)' : t.status === 'done' ? 'var(--green)' : t.status === 'review' ? 'var(--orange)' : 'var(--muted)';
   document.getElementById('detailTitle').textContent = t.title;
-  let html = `<div class="detail-section"><div class="detail-meta">
+  let html = `<div style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:.75rem;font-weight:600;background:${statusColor};color:#000;margin-bottom:12px">${sourceIcon} LIVE · ${t.status.replace('_',' ')}</div>`;
+  html += `<div class="detail-section"><div class="detail-meta">
     <div class="detail-meta-item"><div class="label">Agent</div><div class="value">${esc(agentLabel)}</div></div>
-    <div class="detail-meta-item"><div class="label">Status</div><div class="value"><span class="task-priority priority-medium">${t.status.replace('_',' ')}</span></div></div>
+    <div class="detail-meta-item"><div class="label">Priority</div><div class="value"><span class="task-priority priority-${t.priority || 'medium'}">${t.priority || 'medium'}</span></div></div>
     <div class="detail-meta-item"><div class="label">Source</div><div class="value">${sourceIcon} ${t.source || 'manual'}</div></div>
     <div class="detail-meta-item"><div class="label">Duration</div><div class="value">${dur}</div></div>
     <div class="detail-meta-item"><div class="label">Model</div><div class="value">${esc(modelStr)}</div></div>
     <div class="detail-meta-item"><div class="label">Cost</div><div class="value">${costStr}</div></div>
     <div class="detail-meta-item"><div class="label">Tokens</div><div class="value">${tokens}</div></div>
     <div class="detail-meta-item"><div class="label">Created</div><div class="value">${t.created_at ? new Date(t.created_at).toLocaleString() : '—'}</div></div>
+    ${t.updated_at ? `<div class="detail-meta-item"><div class="label">Updated</div><div class="value">${new Date(t.updated_at).toLocaleString()}</div></div>` : ''}
+    ${t.completed_at ? `<div class="detail-meta-item"><div class="label">Completed</div><div class="value">${new Date(t.completed_at).toLocaleString()}</div></div>` : ''}
   </div></div>`;
   if (t.description) html += `<div class="detail-section"><h3>Description</h3><div class="detail-desc">${esc(t.description)}</div></div>`;
+  if (t.session_key) html += `<div class="detail-section"><h3>Session</h3><div style="font-family:monospace;font-size:.75rem;color:var(--muted);word-break:break-all">${esc(t.session_key)}</div></div>`;
   document.getElementById('detailBody').innerHTML = html;
   document.getElementById('detailModal').classList.add('open');
 }
