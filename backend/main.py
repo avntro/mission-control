@@ -191,9 +191,30 @@ def init_db():
     conn.commit()
     conn.close()
 
+def cleanup_stale_tasks():
+    """Move stale in_progress tasks to done if older than 1 hour with no gateway session."""
+    conn = get_db()
+    stale = conn.execute(
+        "SELECT id, created_at, updated_at FROM tasks WHERE status = 'in_progress'"
+    ).fetchall()
+    now = datetime.now(timezone.utc)
+    for row in stale:
+        try:
+            updated = datetime.fromisoformat(row["updated_at"])
+            if (now - updated).total_seconds() > 3600:
+                conn.execute(
+                    "UPDATE tasks SET status = 'done', completed_at = ?, updated_at = ? WHERE id = ?",
+                    (now.isoformat(), now.isoformat(), row["id"])
+                )
+        except:
+            continue
+    conn.commit()
+    conn.close()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    cleanup_stale_tasks()
     yield
 
 app = FastAPI(title="Mission Control", lifespan=lifespan)
@@ -1281,14 +1302,32 @@ def get_live_tasks():
             else:
                 status = "done"
 
-            # Duration
+            # Duration: parse first and last timestamps from jsonl
             duration = None
-            if started_at and updated_at:
-                try:
-                    start_ts = datetime.fromisoformat(started_at.replace("Z", "+00:00")).timestamp()
-                    duration = (updated_at / 1000) - start_ts
-                except:
-                    pass
+            try:
+                first_ts = None
+                last_ts = None
+                with open(jsonl_path, "r") as jf:
+                    for jline in jf:
+                        try:
+                            je = json.loads(jline)
+                            ts_str = je.get("timestamp", "")
+                            if ts_str:
+                                ts_val = datetime.fromisoformat(ts_str.replace("Z", "+00:00")).timestamp()
+                                if first_ts is None:
+                                    first_ts = ts_val
+                                last_ts = ts_val
+                        except:
+                            continue
+                if first_ts and last_ts:
+                    if is_active:
+                        duration = time.time() - first_ts
+                    else:
+                        duration = last_ts - first_ts
+                    if duration < 0:
+                        duration = 0
+            except:
+                pass
 
             # Determine source type
             source = "subagent" if is_subagent else "cron" if is_cron else "control"

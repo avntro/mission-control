@@ -120,7 +120,14 @@ function renderBoard() {
 
 function liveTaskCardHTML(t) {
   const info = AGENT_INFO[t.assigned_agent] || { name: t.assigned_agent, emoji: '🤖' };
-  const dur = t.duration ? formatDuration(t.duration) : '';
+  // For active tasks, calculate duration live from created_at to now
+  let dur = '';
+  if (t.status === 'in_progress' && t.created_at) {
+    const elapsed = (Date.now() - new Date(t.created_at).getTime()) / 1000;
+    if (elapsed > 0) dur = formatDuration(elapsed);
+  } else if (t.duration && t.duration > 0) {
+    dur = formatDuration(t.duration);
+  }
   const tokens = t.tokens ? formatTokens(t.tokens) : '';
   const sourceIcon = t.source === 'cron' ? '⏰' : t.source === 'subagent' ? '🔀' : '🎮';
   const activePulse = t.status === 'in_progress' ? ' live-pulse' : '';
@@ -139,7 +146,13 @@ function liveTaskCardHTML(t) {
 function taskCardHTML(t) {
   const agent = agents.find(a => a.name === t.assigned_agent);
   const agentLabel = agent ? `${agent.emoji} ${agent.display_name}` : (t.assigned_agent || 'Unassigned');
-  const dur = t.duration ? formatDuration(t.duration) : '';
+  let dur = '';
+  if (t.status === 'in_progress' && t.created_at) {
+    const elapsed = (Date.now() - new Date(t.created_at).getTime()) / 1000;
+    if (elapsed > 0) dur = formatDuration(elapsed);
+  } else if (t.duration && t.duration > 0) {
+    dur = formatDuration(t.duration);
+  }
   return `<div class="task-card" draggable="true" data-id="${t.id}" onclick="openDetail('${t.id}')">
     <div class="task-title">${esc(t.title)}</div>
     <div class="task-meta">
@@ -181,11 +194,12 @@ function renderAgents() {
     const ctxBarColor = ctxPct > 80 ? 'var(--red)' : ctxPct > 50 ? 'var(--orange)' : 'var(--green)';
     const costStr = stats && stats.total_cost > 0 ? `$${stats.total_cost.toFixed(2)}` : '';
     const sessCount = stats ? stats.active_sessions : 0;
+    const lastAct = a.last_activity ? timeAgo(a.last_activity) : 'No activity';
     return `<div class="agent-card">
       <div class="agent-top"><span class="agent-emoji">${a.emoji}</span><span class="agent-name">${esc(a.display_name)}</span><span class="agent-status status-${statusClass}">${statusLabel}</span></div>
       <div class="agent-token-row"><span class="agent-token-label">Context</span><span class="agent-token-value">${tokenStr}</span></div>
       <div class="agent-ctx-bar"><div class="agent-ctx-fill" style="width:${Math.min(ctxPct,100)}%;background:${ctxBarColor}"></div></div>
-      <div class="agent-meta"><span>${costStr ? '💰 '+costStr : esc(a.model)}</span><span>${sessCount > 0 ? sessCount+' session'+(sessCount>1?'s':'') : 'No sessions'}</span></div>
+      <div class="agent-meta"><span>${costStr ? '💰 '+costStr : esc(a.model)}</span><span>🕐 ${lastAct}</span></div>
     </div>`;
   }).join('');
 }
