@@ -350,17 +350,51 @@ async function loadScheduledTasks() {
     const [tasksRes, logRes] = await Promise.all([fetch(`${API}/api/scheduled-tasks`), fetch(`${API}/api/overnight-log`)]);
     const scheduledTasks = await tasksRes.json();
     const overnightLog = await logRes.json();
-    document.getElementById('dailyJobs').innerHTML = scheduledTasks.filter(t => t.type === 'daily').map(jobRowHTML).join('');
-    document.getElementById('weeklyJobs').innerHTML = scheduledTasks.filter(t => t.type === 'weekly').map(jobRowHTML).join('');
+    const daily = scheduledTasks.filter(t => t.type === 'daily');
+    const weekly = scheduledTasks.filter(t => t.type === 'weekly');
+    const oneTime = scheduledTasks.filter(t => t.type === 'one-time');
+    document.getElementById('dailyJobs').innerHTML = daily.length ? daily.map(jobRowHTML).join('') : '<p style="color:var(--muted);padding:12px;font-size:.85rem">No daily jobs</p>';
+    document.getElementById('weeklyJobs').innerHTML = (weekly.length || oneTime.length) ? [...weekly, ...oneTime].map(jobRowHTML).join('') : '<p style="color:var(--muted);padding:12px;font-size:.85rem">No weekly jobs</p>';
     document.getElementById('overnightLog').innerHTML = overnightLog.length ?
-      overnightLog.map(e => { const info = AGENT_INFO[e.agent] || { name: e.agent, emoji: '🤖' }; return `<div class="log-entry"><div class="log-entry-header"><span class="log-entry-title">${esc(e.title)}</span><span class="log-entry-tag">${info.emoji} ${info.name}</span></div><div class="log-entry-body">${esc(e.description)}</div><div class="log-entry-time">${e.time ? timeAgo(e.time) : ''}</div></div>`; }).join('') :
-      '<p style="text-align:center;color:var(--muted);padding:20px">No overnight log entries</p>';
+      overnightLog.map(logEntryHTML).join('') :
+      '<p style="text-align:center;color:var(--muted);padding:20px">No activity in last 24h</p>';
   } catch(e) { console.error(e); }
 }
 
 function jobRowHTML(job) {
   const info = AGENT_INFO[job.agent] || { name: job.agent, emoji: '🤖' };
-  return `<div class="job-row"><span class="job-icon">${job.icon || '⚙️'}</span><span class="job-status-dot" style="background:${job.status === 'active' ? '#00E676' : '#888'}"></span><div class="job-info"><div class="job-title">${esc(job.title)}</div><div class="job-desc">${esc(job.description)}</div></div><span class="job-agent-pill">${info.emoji} ${info.name}</span><span class="job-schedule">${esc(job.schedule_human)}</span></div>`;
+  const statusDot = job.status === 'active' ? '#00E676' : '#888';
+  const lastIcon = job.last_status === 'ok' ? '✅' : job.last_status === 'error' ? '❌' : '⏳';
+  const lastRun = job.last_run ? timeAgo(job.last_run) : 'Never';
+  const nextRun = job.next_run ? timeAgo(job.next_run) : '';
+  const durStr = job.last_duration_ms ? `${(job.last_duration_ms/1000).toFixed(1)}s` : '';
+  const oneTimeBadge = job.delete_after_run ? '<span class="job-onetime-badge">ONE-TIME</span>' : '';
+  return `<div class="job-row">
+    <span class="job-icon">${lastIcon}</span>
+    <span class="job-status-dot" style="background:${statusDot}"></span>
+    <div class="job-info">
+      <div class="job-title">${esc(job.title)} ${oneTimeBadge}</div>
+      <div class="job-desc">${esc(job.description)}</div>
+      <div class="job-run-info">Last: ${lastRun}${durStr ? ' ('+durStr+')' : ''} ${nextRun ? '· Next: '+nextRun : ''}</div>
+    </div>
+    <span class="job-agent-pill">${info.emoji} ${info.name}</span>
+    <span class="job-schedule">${esc(job.schedule_human)}</span>
+  </div>`;
+}
+
+function logEntryHTML(e) {
+  const info = AGENT_INFO[e.agent] || { name: e.agent || 'System', emoji: '🤖' };
+  const sourceIcon = e.source === 'cron' ? '⏰' : e.source === 'subagent' ? '🔀' : e.source === 'session' ? '💬' : '📌';
+  const successBadge = e.success ? '' : '<span class="log-fail-badge">FAILED</span>';
+  return `<div class="log-entry">
+    <div class="log-entry-header">
+      <span class="log-entry-icon">${sourceIcon}</span>
+      <span class="log-entry-title">${esc(e.title)} ${successBadge}</span>
+      <span class="log-entry-tag">${info.emoji} ${info.name}</span>
+    </div>
+    <div class="log-entry-body">${esc(e.description)}</div>
+    <div class="log-entry-time">${e.time ? timeAgo(e.time) : ''}</div>
+  </div>`;
 }
 
 // ══════════════════════════════════════════════════════════════

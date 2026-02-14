@@ -409,3 +409,9 @@ body{
 .live-task.live-pulse{animation:livePulse 2s ease-in-out infinite}
 @keyframes livePulse{0%,100%{border-left-color:var(--green)}50%{border-left-color:var(--orange)}}
 .task-tokens{font-size:.65rem;color:var(--muted);font-family:monospace}
+
+/* ── Real Scheduled Tasks Styles ──────────────────────── */
+.job-run-info{font-size:.65rem;color:var(--muted);margin-top:2px}
+.job-onetime-badge{font-size:.55rem;font-weight:700;color:var(--orange);background:rgba(255,171,64,.15);padding:1px 5px;border-radius:3px;margin-left:6px;vertical-align:middle}
+.log-entry-icon{margin-right:6px}
+.log-fail-badge{font-size:.55rem;font-weight:700;color:var(--red);background:rgba(255,82,82,.15);padding:1px 5px;border-radius:3px;margin-left:6px}

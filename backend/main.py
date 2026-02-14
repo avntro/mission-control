@@ -209,6 +209,15 @@ def add_activity(conn, agent, action, details="", task_id=None, success=True, du
 
 # ── GPU Stats ───────────────────────────────────────────────────
 GPU_STATS_FILE = "/data/gpu_stats.json"
+SYSTEM_STATS_FILE = "/data/system_stats.json"
+
+@app.get("/api/system")
+def get_system_stats():
+    try:
+        with open(SYSTEM_STATS_FILE, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        raise HTTPException(503, "System stats not available")
 
 @app.get("/api/gpu")
 def get_gpu_stats():
@@ -382,45 +391,28 @@ async def list_agents():
     conn = get_db()
     rows = conn.execute("SELECT * FROM agents ORDER BY name").fetchall()
     agents_list = [dict(r) for r in rows]
-    
-    # Try to sync with gateway sessions for live status
-    try:
-        async with httpx.AsyncClient(verify=False, timeout=5) as client:
-            headers = {}
-            if GATEWAY_TOKEN:
-                headers["Authorization"] = f"Bearer {GATEWAY_TOKEN}"
-            # Try multiple auth methods
-            resp = None
-            for attempt in [
-                lambda: client.get(f"{GATEWAY_URL}/api/v1/sessions", headers=headers),
-                lambda: client.get(f"{GATEWAY_URL}/api/sessions", headers=headers),
-            ]:
-                try:
-                    resp = await attempt()
-                    if resp.status_code == 200:
-                        break
-                except:
-                    continue
-            
-            if resp and resp.status_code == 200:
-                sessions = resp.json()
-                # Map active sessions to agents
-                active_agents = set()
-                for s in sessions:
-                    agent_id = s.get("agent") or s.get("agentId") or ""
-                    if agent_id and s.get("status") in ("running", "active", "busy"):
-                        active_agents.add(agent_id)
-                
-                # Update agent statuses
-                for agent in agents_list:
-                    if agent["name"] in active_agents:
-                        agent["status"] = "busy"
-                    elif agent["status"] == "busy":
-                        # If DB says busy but gateway says no active session, mark idle
-                        agent["status"] = "idle"
-    except:
-        pass  # Gateway unreachable, use DB status
-    
+
+    # Enrich with live status from agent-stats
+    agents_dir = os.path.join(OPENCLAW_HOME, "agents")
+    for agent in agents_list:
+        stats = _parse_session_stats(os.path.join(agents_dir, agent["name"]))
+        if stats["active"]:
+            agent["status"] = "busy"
+        else:
+            agent["status"] = "idle"
+        if stats["model"]:
+            agent["model"] = stats["model"]
+        # Add last activity from session updatedAt
+        sessions_file = os.path.join(agents_dir, agent["name"], "sessions", "sessions.json")
+        try:
+            with open(sessions_file, "r") as f:
+                sess_data = json.load(f)
+            max_updated = max((v.get("updatedAt", 0) for v in sess_data.values()), default=0)
+            if max_updated:
+                agent["last_activity"] = datetime.fromtimestamp(max_updated / 1000, tz=timezone.utc).isoformat()
+        except:
+            pass
+
     conn.close()
     return agents_list
 
@@ -445,9 +437,10 @@ def update_agent(name: str, a: AgentUpdate):
     conn.close()
     return dict(row)
 
-# ── Activity Feed ───────────────────────────────────────────────
+# ── Activity Feed (merged: DB + real sessions) ──────────────────
 @app.get("/api/activity")
 def list_activity(agent: Optional[str] = None, limit: int = 50):
+    # Get DB activity
     conn = get_db()
     q = "SELECT * FROM activity_feed"
     params = []
@@ -458,43 +451,225 @@ def list_activity(agent: Optional[str] = None, limit: int = 50):
     params.append(limit)
     rows = conn.execute(q, params).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    db_items = [dict(r) for r in rows]
 
-# ── Scheduled Tasks ─────────────────────────────────────────────
+    # Merge with real overnight log entries (which come from sessions)
+    # This ensures the activity feed shows real data even without webhooks
+    try:
+        real_entries = get_overnight_log_internal(agent)
+        for entry in real_entries:
+            db_items.append({
+                "id": entry["id"],
+                "agent": entry["agent"],
+                "action": entry["tag"],
+                "details": entry["description"],
+                "task_id": None,
+                "success": entry["success"],
+                "duration": None,
+                "created_at": entry["time"],
+                "source": entry.get("source", "live"),
+            })
+    except:
+        pass
+
+    # Deduplicate by id and sort
+    seen = set()
+    unique = []
+    for item in db_items:
+        if item["id"] not in seen:
+            seen.add(item["id"])
+            unique.append(item)
+    unique.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return unique[:limit]
+
+def get_overnight_log_internal(agent_filter=None):
+    """Internal helper for overnight log - reused by activity feed."""
+    entries = []
+    # Subagent runs
+    try:
+        with open(SUBAGENT_RUNS_FILE, "r") as f:
+            data = json.load(f)
+        runs = data.get("runs", {})
+        for rid, r in runs.items():
+            task = r.get("task", "")[:200]
+            session_key = r.get("childSessionKey", "")
+            agent_name = session_key.split(":")[1] if ":" in session_key else ""
+            if agent_filter and agent_name != agent_filter:
+                continue
+            created = r.get("createdAtMs", r.get("startedAtMs", 0))
+            entries.append({
+                "id": rid[:8],
+                "title": f"Subagent Task",
+                "description": task.split("\n")[0][:150],
+                "agent": agent_name,
+                "tag": "subagent_run",
+                "time": datetime.fromtimestamp(created / 1000, tz=timezone.utc).isoformat() if created else "",
+                "success": 1,
+                "source": "subagent",
+            })
+    except:
+        pass
+    # Cron runs
+    try:
+        with open(CRON_JOBS_FILE, "r") as f:
+            data = json.load(f)
+        for job in data.get("jobs", []):
+            agent_name = job.get("agentId", "")
+            if agent_filter and agent_name != agent_filter:
+                continue
+            state = job.get("state", {})
+            last_run_ms = state.get("lastRunAtMs")
+            if last_run_ms:
+                entries.append({
+                    "id": job["id"][:8],
+                    "title": f"Cron: {job.get('name', 'Unknown')}",
+                    "description": f"Status: {state.get('lastStatus', 'unknown')} | Duration: {state.get('lastDurationMs', 0)}ms",
+                    "agent": agent_name,
+                    "tag": "cron_run",
+                    "time": datetime.fromtimestamp(last_run_ms / 1000, tz=timezone.utc).isoformat(),
+                    "success": 1 if state.get("lastStatus") == "ok" else 0,
+                    "source": "cron",
+                })
+    except:
+        pass
+    entries.sort(key=lambda e: e.get("time", ""), reverse=True)
+    return entries[:30]
+
+# ── Scheduled Tasks (REAL from OpenClaw cron store) ─────────────
+CRON_JOBS_FILE = os.path.join(OPENCLAW_HOME, "cron", "jobs.json")
+
+def _humanize_schedule(sched: dict) -> str:
+    kind = sched.get("kind", "")
+    if kind == "cron":
+        expr = sched.get("expr", "")
+        tz = sched.get("tz", "UTC")
+        return f"Cron: {expr} ({tz})"
+    elif kind == "at":
+        at = sched.get("at", "")
+        try:
+            dt = datetime.fromisoformat(at.replace("Z", "+00:00"))
+            return f"One-time: {dt.strftime('%b %d, %Y %H:%M')}"
+        except:
+            return f"At: {at}"
+    elif kind == "every":
+        ms = sched.get("everyMs", 0)
+        if ms >= 3600000:
+            return f"Every {ms // 3600000}h"
+        elif ms >= 60000:
+            return f"Every {ms // 60000}m"
+        return f"Every {ms}ms"
+    return str(sched)
+
+def _classify_schedule(sched: dict) -> str:
+    kind = sched.get("kind", "")
+    if kind == "cron":
+        expr = sched.get("expr", "")
+        parts = expr.split()
+        # Check if it runs on specific days of week
+        if len(parts) >= 5 and parts[4] not in ("*", ""):
+            if parts[4] in ("0", "1", "7"):
+                return "weekly"
+        return "daily"
+    elif kind == "at":
+        return "one-time"
+    elif kind == "every":
+        ms = sched.get("everyMs", 0)
+        if ms >= 86400000:
+            return "weekly"
+        return "daily"
+    return "daily"
+
 @app.get("/api/scheduled-tasks")
 def get_scheduled_tasks():
-    tasks = [
-        {"id":"daily-memory-backup","title":"Daily Memory Backup","description":"Backup all agent MEMORY.md files","schedule":"0 3 * * *","schedule_human":"Daily at 3:00 AM","type":"daily","status":"active","agent":"it-support","last_run":None,"icon":"💾"},
-        {"id":"trading-market-scan","title":"Market Open Scan","description":"Scan markets at opening for trading signals","schedule":"30 9 * * 1-5","schedule_human":"Mon-Fri at 9:30 AM","type":"daily","status":"active","agent":"trading","last_run":None,"icon":"📊"},
-        {"id":"trading-close-review","title":"Market Close Review","description":"Review positions and P&L at market close","schedule":"0 16 * * 1-5","schedule_human":"Mon-Fri at 4:00 PM","type":"daily","status":"active","agent":"trading","last_run":None,"icon":"📈"},
-        {"id":"health-check","title":"System Health Check","description":"Check all services, Docker containers, and disk space","schedule":"*/30 * * * *","schedule_human":"Every 30 minutes","type":"daily","status":"active","agent":"it-support","last_run":None,"icon":"🏥"},
-        {"id":"overnight-summary","title":"Overnight Activity Summary","description":"Compile overnight agent activity into daily report","schedule":"0 7 * * *","schedule_human":"Daily at 7:00 AM","type":"daily","status":"active","agent":"main","last_run":None,"icon":"🌅"},
-        {"id":"weekly-standup","title":"Weekly Team Standup","description":"Auto-trigger weekly standup summary for all agents","schedule":"0 9 * * 1","schedule_human":"Monday at 9:00 AM","type":"weekly","status":"active","agent":"main","last_run":None,"icon":"📋"},
-        {"id":"weekly-performance","title":"Weekly Performance Report","description":"Aggregate token usage, costs, task completion rates","schedule":"0 18 * * 5","schedule_human":"Friday at 6:00 PM","type":"weekly","status":"active","agent":"dev","last_run":None,"icon":"📊"},
-        {"id":"weekly-backup","title":"Weekly Full Backup","description":"Full backup of all workspaces and databases","schedule":"0 2 * * 0","schedule_human":"Sunday at 2:00 AM","type":"weekly","status":"active","agent":"it-support","last_run":None,"icon":"💿"},
-    ]
-    return tasks
+    try:
+        with open(CRON_JOBS_FILE, "r") as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
 
-# ── Overnight Log ───────────────────────────────────────────────
+    jobs = data.get("jobs", [])
+    result = []
+    for job in jobs:
+        state = job.get("state", {})
+        sched = job.get("schedule", {})
+        last_run_ms = state.get("lastRunAtMs")
+        last_run = None
+        if last_run_ms:
+            last_run = datetime.fromtimestamp(last_run_ms / 1000, tz=timezone.utc).isoformat()
+        next_run_ms = state.get("nextRunAtMs")
+        next_run = None
+        if next_run_ms:
+            next_run = datetime.fromtimestamp(next_run_ms / 1000, tz=timezone.utc).isoformat()
+
+        # Extract task description from payload
+        payload = job.get("payload", {})
+        desc = payload.get("message", payload.get("text", ""))[:200]
+
+        result.append({
+            "id": job.get("id", ""),
+            "title": job.get("name", "Unnamed Job"),
+            "description": desc,
+            "schedule": sched.get("expr", "") or json.dumps(sched),
+            "schedule_human": _humanize_schedule(sched),
+            "type": _classify_schedule(sched),
+            "status": "active" if job.get("enabled", True) else "disabled",
+            "agent": job.get("agentId", ""),
+            "last_run": last_run,
+            "next_run": next_run,
+            "last_status": state.get("lastStatus", "never"),
+            "last_duration_ms": state.get("lastDurationMs"),
+            "consecutive_errors": state.get("consecutiveErrors", 0),
+            "delete_after_run": job.get("deleteAfterRun", False),
+            "icon": "⏰",
+        })
+    return result
+
+# ── Overnight Log (REAL from session files + subagent runs) ─────
+SUBAGENT_RUNS_FILE = os.path.join(OPENCLAW_HOME, "subagents", "runs.json")
+
 @app.get("/api/overnight-log")
 def get_overnight_log():
-    conn = get_db()
-    rows = conn.execute("SELECT * FROM activity_feed ORDER BY created_at DESC LIMIT 20").fetchall()
-    conn.close()
-    entries = []
-    for r in rows:
-        d = dict(r)
-        entries.append({
-            "id": d["id"], "title": d["action"].replace("_", " ").title(),
-            "description": d["details"] or "No details", "agent": d["agent"],
-            "tag": d["action"], "time": d["created_at"], "success": d["success"]
-        })
-    if not entries:
-        entries = [
-            {"id":"example-1","title":"System Health Check ✅","description":"All services healthy.","agent":"it-support","tag":"health_check","time":now_iso(),"success":1},
-            {"id":"example-2","title":"Dashboard Update 🔧","description":"Mission Control Phase 3 deployed.","agent":"dev","tag":"deployment","time":now_iso(),"success":1},
-        ]
-    return entries
+    """Return real activity from agent sessions and subagent runs."""
+    entries = get_overnight_log_internal()
+
+    # Also add recent interactive sessions
+    agents_dir = os.path.join(OPENCLAW_HOME, "agents")
+    for agent_name in os.listdir(agents_dir):
+        sessions_file = os.path.join(agents_dir, agent_name, "sessions", "sessions.json")
+        if not os.path.exists(sessions_file):
+            continue
+        try:
+            with open(sessions_file, "r") as f:
+                sessions_data = json.load(f)
+        except:
+            continue
+        for session_key, sess_info in sessions_data.items():
+            sid = sess_info.get("sessionId", "")
+            updated_at = sess_info.get("updatedAt", 0)
+            if not updated_at or (time.time() * 1000 - updated_at) > 86400000:
+                continue
+            if ":subagent:" in session_key:
+                continue
+            if any(x in session_key for x in [":main", ":mobile", ":webchat"]):
+                jsonl_path = os.path.join(agents_dir, agent_name, "sessions", f"{sid}.jsonl")
+                if not os.path.exists(jsonl_path):
+                    continue
+                try:
+                    msg_count = sum(1 for line in open(jsonl_path, "r") if '"type":"message"' in line)
+                    if msg_count > 0:
+                        channel = session_key.split(":")[-1]
+                        entries.append({
+                            "id": sid[:8], "title": f"Session: {agent_name} ({channel})",
+                            "description": f"{msg_count} messages exchanged",
+                            "agent": agent_name, "tag": "session",
+                            "time": datetime.fromtimestamp(updated_at / 1000, tz=timezone.utc).isoformat(),
+                            "success": 1, "source": "session",
+                        })
+                except:
+                    continue
+
+    entries.sort(key=lambda e: e.get("time", ""), reverse=True)
+    return entries[:30]
 
 # ── Workspaces (file browser + editor) ──────────────────────────
 WORKSPACE_MAP = {
