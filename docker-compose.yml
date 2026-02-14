@@ -5,11 +5,16 @@ services:
     container_name: mission-control
     restart: unless-stopped
     ports:
-      - "3335:3335"
+      - "127.0.0.1:3335:3335"
     volumes:
       - mc-data:/data
+      - /home/pc1/.openclaw:/home/pc1/.openclaw:ro
+      - /tmp/gpu_stats.json:/data/gpu_stats.json:ro
     environment:
       - MC_DB=/data/mission_control.db
+      - GATEWAY_URL=https://100.101.174.1:18789
+      - GATEWAY_TOKEN=cc5f17fcf98169066f5e248bc2576676feea61d8d84b1ffc
+      - OPENCLAW_HOME=/home/pc1/.openclaw
 
 volumes:
   mc-data:

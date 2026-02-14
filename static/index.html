@@ -4,82 +4,235 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mission Control — OpenClaw</title>
-<meta name="theme-color" content="#0f0f1a">
+<meta name="theme-color" content="#1a1a1a">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
-<!-- Header -->
-<header class="header">
-  <div class="header-left">
+<!-- Top Navigation -->
+<nav class="topnav">
+  <div class="topnav-left">
     <span class="logo">⚡</span>
-    <h1>Mission Control</h1>
-    <span class="badge" id="taskCount">0 tasks</span>
+    <span class="brand">Mission Control</span>
   </div>
-  <div class="header-right">
+  <div class="topnav-tabs">
+    <button class="nav-tab active" data-page="dashboard" onclick="navigateTo('dashboard')">📊 Dashboard</button>
+    <button class="nav-tab" data-page="taskmanager" onclick="navigateTo('taskmanager')">🖥️ Task Manager</button>
+    <button class="nav-tab" data-page="orgchart" onclick="navigateTo('orgchart')">🏢 Org Chart</button>
+    <button class="nav-tab" data-page="scheduled" onclick="navigateTo('scheduled')">⏰ Scheduled Tasks</button>
+    <button class="nav-tab" data-page="workspaces" onclick="navigateTo('workspaces')">📁 Workspaces</button>
+    <button class="nav-tab" data-page="standups" onclick="navigateTo('standups')">💬 Standups</button>
+  </div>
+  <div class="topnav-right">
+    <span class="dot dot-green"></span>
+    <span id="navStatus">Online</span>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PAGE: Dashboard (original kanban) -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="page active" id="page-dashboard">
+  <div class="page-header">
+    <h2>📋 Dashboard</h2>
     <button class="btn btn-primary" onclick="openCreateModal()">+ New Task</button>
-    <div class="header-status">
-      <span class="dot dot-green"></span>
-      <span id="agentStatusSummary">6 agents</span>
+  </div>
+
+  <div class="layout">
+    <aside class="sidebar" id="agentsPanel">
+      <h2>🤖 Agents</h2>
+      <div id="agentsList"></div>
+      <h2 style="margin-top:20px">🎮 GPU Stats</h2>
+      <div id="gpuWidget" class="gpu-widget">
+        <div class="gpu-loading">Loading...</div>
+      </div>
+    </aside>
+    <main class="main">
+      <div class="tabs">
+        <button class="tab active" data-tab="board" onclick="switchTab('board')">📋 Board</button>
+        <button class="tab" data-tab="activity" onclick="switchTab('activity')">📡 Activity</button>
+      </div>
+      <div class="tab-content active" id="boardView">
+        <div class="kanban">
+          <div class="kanban-col" data-status="todo">
+            <div class="col-header"><span class="col-dot" style="background:#6c63ff"></span>Todo <span class="col-count" id="count-todo">0</span></div>
+            <div class="col-cards" id="col-todo" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)"></div>
+          </div>
+          <div class="kanban-col" data-status="in_progress">
+            <div class="col-header"><span class="col-dot" style="background:#ffab40"></span>In Progress <span class="col-count" id="count-in_progress">0</span></div>
+            <div class="col-cards" id="col-in_progress" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)"></div>
+          </div>
+          <div class="kanban-col" data-status="review">
+            <div class="col-header"><span class="col-dot" style="background:#e040fb"></span>Review <span class="col-count" id="count-review">0</span></div>
+            <div class="col-cards" id="col-review" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)"></div>
+          </div>
+          <div class="kanban-col" data-status="done">
+            <div class="col-header"><span class="col-dot" style="background:#00E676"></span>Done <span class="col-count" id="count-done">0</span></div>
+            <div class="col-cards" id="col-done" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)"></div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-content" id="activityView">
+        <div class="activity-header">
+          <select id="activityFilter" onchange="loadActivity()">
+            <option value="">All Agents</option>
+            <option value="main">Mike</option>
+            <option value="trading">Trading / AA</option>
+            <option value="it-support">IT Support</option>
+            <option value="dev">Dev</option>
+            <option value="voice">Voice</option>
+            <option value="troubleshoot">Troubleshoot</option>
+          </select>
+        </div>
+        <div id="activityFeed"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PAGE: Task Manager -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="page" id="page-taskmanager">
+  <div class="page-header">
+    <div>
+      <h2>🖥️ Task Manager</h2>
+      <p class="page-subtitle">Agent fleet overview and session tracking</p>
     </div>
   </div>
-</header>
 
-<!-- Main Layout -->
-<div class="layout">
-  <!-- Left: Agents Panel -->
-  <aside class="sidebar" id="agentsPanel">
-    <h2>🤖 Agents</h2>
-    <div id="agentsList"></div>
-  </aside>
-
-  <!-- Center: Kanban Board -->
-  <main class="main">
-    <!-- Tabs -->
-    <div class="tabs">
-      <button class="tab active" data-tab="board" onclick="switchTab('board')">📋 Board</button>
-      <button class="tab" data-tab="activity" onclick="switchTab('activity')">📡 Activity</button>
-    </div>
-
-    <!-- Board View -->
-    <div class="tab-content active" id="boardView">
-      <div class="kanban">
-        <div class="kanban-col" data-status="todo">
-          <div class="col-header"><span class="col-dot" style="background:#6c63ff"></span>Todo <span class="col-count" id="count-todo">0</span></div>
-          <div class="col-cards" id="col-todo" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)"></div>
-        </div>
-        <div class="kanban-col" data-status="in_progress">
-          <div class="col-header"><span class="col-dot" style="background:#ffab40"></span>In Progress <span class="col-count" id="count-in_progress">0</span></div>
-          <div class="col-cards" id="col-in_progress" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)"></div>
-        </div>
-        <div class="kanban-col" data-status="review">
-          <div class="col-header"><span class="col-dot" style="background:#e040fb"></span>Review <span class="col-count" id="count-review">0</span></div>
-          <div class="col-cards" id="col-review" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)"></div>
-        </div>
-        <div class="kanban-col" data-status="done">
-          <div class="col-header"><span class="col-dot" style="background:#00E676"></span>Done <span class="col-count" id="count-done">0</span></div>
-          <div class="col-cards" id="col-done" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="dragLeave(event)"></div>
-        </div>
+  <!-- Stats Bar -->
+  <div class="stats-bar" id="statsBar">
+    <div class="stat-card">
+      <span class="stat-dot" style="background:#6c63ff"></span>
+      <div class="stat-info">
+        <span class="stat-number" id="stat-total">6</span>
+        <span class="stat-label">Total Agents</span>
       </div>
     </div>
-
-    <!-- Activity View -->
-    <div class="tab-content" id="activityView">
-      <div class="activity-header">
-        <select id="activityFilter" onchange="loadActivity()">
-          <option value="">All Agents</option>
-          <option value="main">Mike</option>
-          <option value="trading">Trading / AA</option>
-          <option value="it-support">IT Support</option>
-          <option value="dev">Dev</option>
-          <option value="voice">Voice</option>
-          <option value="troubleshoot">Troubleshoot</option>
-        </select>
+    <div class="stat-card">
+      <span class="stat-dot" style="background:#00E676"></span>
+      <div class="stat-info">
+        <span class="stat-number" id="stat-active">0</span>
+        <span class="stat-label">Active</span>
       </div>
-      <div id="activityFeed"></div>
     </div>
-  </main>
+    <div class="stat-card">
+      <span class="stat-dot" style="background:#00bcd4"></span>
+      <div class="stat-info">
+        <span class="stat-number" id="stat-idle">6</span>
+        <span class="stat-label">Idle</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <span class="stat-dot" style="background:#ffab40"></span>
+      <div class="stat-info">
+        <span class="stat-number" id="stat-busy">0</span>
+        <span class="stat-label">Busy</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <span class="stat-dot" style="background:#ff5252"></span>
+      <div class="stat-info">
+        <span class="stat-number" id="stat-error">0</span>
+        <span class="stat-label">Error</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Agent Cards -->
+  <div class="agent-cards-row" id="agentCardsRow"></div>
 </div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PAGE: Org Chart -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="page" id="page-orgchart">
+  <div class="page-header">
+    <div>
+      <h2>🏢 Organization Chart</h2>
+      <p class="page-subtitle">Team hierarchy and reporting structure</p>
+    </div>
+    <div class="page-actions">
+      <button class="btn" onclick="expandAllOrg()">Expand All</button>
+      <button class="btn" onclick="collapseAllOrg()">Collapse All</button>
+    </div>
+  </div>
+
+  <div class="org-tree" id="orgTree"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PAGE: Scheduled Tasks -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="page" id="page-scheduled">
+  <div class="page-header">
+    <div>
+      <h2>⏰ Scheduled Tasks</h2>
+      <p class="page-subtitle">Cron jobs, weekly tasks, and overnight log</p>
+    </div>
+  </div>
+
+  <div class="scheduled-sections">
+    <div class="section-block">
+      <h3 class="section-title">📅 Daily Jobs</h3>
+      <div id="dailyJobs"></div>
+    </div>
+    <div class="section-block">
+      <h3 class="section-title">📆 Weekly Jobs</h3>
+      <div id="weeklyJobs"></div>
+    </div>
+    <div class="section-block">
+      <h3 class="section-title">🌙 Overnight Log</h3>
+      <div id="overnightLog"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PAGE: Workspaces -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="page" id="page-workspaces">
+  <div class="page-header">
+    <div>
+      <h2>📁 Agent Workspaces</h2>
+      <p class="page-subtitle">View agent configuration files</p>
+    </div>
+  </div>
+
+  <div class="workspace-layout">
+    <aside class="ws-sidebar" id="wsSidebar">
+      <div class="ws-section-title">WORKSPACES</div>
+      <div id="wsAgentList"></div>
+    </aside>
+    <main class="ws-content" id="wsContent">
+      <div class="ws-placeholder">
+        <span>📄</span>
+        <p>Select an agent and file to view</p>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PAGE: Standups -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="page" id="page-standups">
+  <div class="page-header">
+    <div>
+      <h2>💬 Standups & Action Items</h2>
+      <p class="page-subtitle">Team discussions and tracked action items</p>
+    </div>
+    <button class="btn btn-primary" onclick="openStandupModal()">+ New Standup</button>
+  </div>
+
+  <div id="standupsList"></div>
+  <div id="standupDetail" style="display:none"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Modals -->
+<!-- ═══════════════════════════════════════════════════════════ -->
 
 <!-- Task Detail Modal -->
 <div class="modal-overlay" id="detailModal" onclick="closeDetailIfOutside(event)">
@@ -124,6 +277,33 @@
       <div class="form-actions">
         <button type="button" class="btn" onclick="closeCreate()">Cancel</button>
         <button type="submit" class="btn btn-primary">Create Task</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Create Standup Modal -->
+<div class="modal-overlay" id="standupModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal modal-sm" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2>New Standup</h2>
+      <button class="modal-close" onclick="document.getElementById('standupModal').classList.remove('open')">✕</button>
+    </div>
+    <form class="modal-body" onsubmit="createStandup(event)">
+      <label>Title *</label>
+      <input type="text" id="standupTitle" required placeholder="Standup topic...">
+      <label>Participants</label>
+      <div class="checkbox-group">
+        <label class="cb-label"><input type="checkbox" value="main" checked> 🎯 Mike</label>
+        <label class="cb-label"><input type="checkbox" value="trading"> 📈 Trading / AA</label>
+        <label class="cb-label"><input type="checkbox" value="it-support"> 🔧 IT Support</label>
+        <label class="cb-label"><input type="checkbox" value="dev"> 💻 Dev</label>
+        <label class="cb-label"><input type="checkbox" value="voice"> 🎙️ Voice</label>
+        <label class="cb-label"><input type="checkbox" value="troubleshoot"> 🔍 Troubleshoot</label>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn" onclick="document.getElementById('standupModal').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Standup</button>
       </div>
     </form>
   </div>
