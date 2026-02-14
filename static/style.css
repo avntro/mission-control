@@ -472,7 +472,7 @@ body{
   .agent-cards-row{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
   .voice-features{grid-template-columns:1fr}
   .layout{flex-direction:column!important;height:auto!important}
-  .sidebar{width:100%!important;min-width:100%!important;border-right:none;border-bottom:1px solid var(--border);max-height:400px!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch;position:relative;padding:10px}
+  .sidebar{width:100%!important;min-width:100%!important;border-right:none;border-bottom:1px solid var(--border);max-height:calc(100vh - 60px)!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;position:relative;padding:10px}
   .sidebar h2{display:inline-block;font-size:.75rem;margin-bottom:8px;margin-right:12px}
   .sidebar h2:nth-of-type(2),.sidebar h2:nth-of-type(3){font-size:.7rem;margin-top:10px}
   #agentsList{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;mask-image:linear-gradient(to right,#000 90%,transparent);-webkit-mask-image:linear-gradient(to right,#000 90%,transparent)}
