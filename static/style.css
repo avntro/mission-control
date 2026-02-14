@@ -42,6 +42,8 @@ body{
 .topnav-tabs{display:flex;gap:2px;flex:1;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none;mask-image:linear-gradient(to right,#000 90%,transparent);-webkit-mask-image:linear-gradient(to right,#000 90%,transparent)}
 .topnav-tabs::-webkit-scrollbar{display:none}
 .topnav-tabs:hover,.topnav-tabs:focus-within{mask-image:none;-webkit-mask-image:none}
+.topnav-tabs.has-overflow-right::after{content:'›';position:sticky;right:0;padding:0 4px;color:var(--accent);font-size:1.2rem;font-weight:700;opacity:.7;pointer-events:none;background:linear-gradient(to right,transparent,var(--surface) 40%)}
+.topnav-tabs.has-overflow-left::before{content:'‹';position:sticky;left:0;padding:0 4px;color:var(--accent);font-size:1.2rem;font-weight:700;opacity:.7;pointer-events:none;background:linear-gradient(to left,transparent,var(--surface) 40%)}
 .nav-tab{padding:8px 14px;border-radius:var(--radius);border:none;background:transparent;color:var(--muted);font-size:.82rem;cursor:pointer;font-weight:500;transition:all .15s;white-space:nowrap}
 .nav-tab.active{background:var(--accent);color:#fff;box-shadow:0 0 12px rgba(0,188,212,0.3)}
 .nav-tab:hover:not(.active){color:var(--text);background:var(--card)}
@@ -208,6 +210,7 @@ body{
 .org-children{display:flex;justify-content:center;gap:20px;position:relative;padding-top:20px}
 .org-children::before{content:'';position:absolute;top:0;left:20%;right:20%;height:2px;background:var(--border-hover)}
 .org-children.collapsed{display:none}
+.ws-files.collapsed{display:none}
 
 /* ── Scheduled Tasks ────────────────────────────────────────── */
 .scheduled-sections{display:flex;flex-direction:column;gap:24px}
@@ -460,8 +463,11 @@ body{
   .stat-card{min-width:120px;padding:12px 14px;flex:1 1 calc(33% - 8px)}
   .stat-number{font-size:1.2rem}
   /* Org chart responsive */
-  .org-children{flex-wrap:wrap;gap:16px}
-  .org-node{min-width:150px}
+  .org-children{flex-wrap:wrap;gap:16px;padding-top:10px}
+  .org-children::before{left:10%;right:10%}
+  .org-node{min-width:140px;max-width:200px;padding:12px 14px}
+  .org-tree{padding:10px 0 40px}
+  .org-level{margin-bottom:20px}
   /* Workspace layout on tablet */
   .workspace-layout{flex-direction:column;height:auto}
   .ws-sidebar{width:100%!important;min-width:100%!important;max-height:250px;overflow-y:auto;border-right:none;border-bottom:1px solid var(--border)}

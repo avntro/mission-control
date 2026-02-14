@@ -12,12 +12,9 @@ let orgExpanded = true;
 function cleanTitle(title) {
   if (!title) return 'Untitled';
   let t = title;
-  // Strip timestamps like [Sat 2026-02-14 18:24 GMT+2] or [2026-02-14 18:24]
-  t = t.replace(/\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?:\s*[A-Z]{2,5}[+-]?\d*)?\]/gi, '');
-  t = t.replace(/\[\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}[^\]]*\]/g, '');
-  // Strip cron prefixes [cron:...]
-  t = t.replace(/\[cron:[^\]]+\]\s*/gi, '');
-  // Strip URLs (including parenthesized)
+  // Strip any bracketed timestamps: [Sat 2026-02-14 ...], [2026-02-14 ...], [cron:...], [Telegram], etc.
+  t = t.replace(/\[[^\]]{0,80}\]/g, '');
+  // Strip URLs (including parenthesized, with or without trailing paths)
   t = t.replace(/\(?https?:\/\/[^\s)]+\)?\s*/g, '');
   // Strip markdown bold/italic
   t = t.replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1');
@@ -26,12 +23,16 @@ function cleanTitle(title) {
   t = t.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
   // Strip markdown headers
   t = t.replace(/^#+\s+/gm, '');
-  // Strip CRITICAL:/URGENT:/etc. prefixes
-  t = t.replace(/^(?:CRITICAL|URGENT|PRIORITY|IMPORTANT|MANDATORY)(?:\s+(?:BUG|TASK|FIX|ISSUE))?\s*:\s*/i, '');
+  // Strip CRITICAL:/URGENT:/CONTINUE/etc. prefixes
+  t = t.replace(/^(?:CRITICAL|URGENT|PRIORITY|IMPORTANT|MANDATORY|CONTINUE|CONTINUOUS)(?:\s+(?:BUG|TASK|FIX|ISSUE|IMPROVING|IMPROVEMENT))?\s*:?\s*/i, '');
+  // Strip DOWNLOAD/BUILD/etc. all-caps action verbs at start
+  t = t.replace(/^(?:DOWNLOAD|BUILD|CREATE|SETUP|DEPLOY|UPDATE|FIX|IMPLEMENT)\s+/i, (m) => m.charAt(0) + m.slice(1).toLowerCase());
   // Clean up extra whitespace, dashes, pipes, parens
   t = t.replace(/\s*[|—–]\s*$/, '').replace(/^\s*[|—–]\s*/, '');
-  t = t.replace(/\(\s*\)/g, ''); // empty parens from URL removal
+  t = t.replace(/\(\s*\)/g, '');
   t = t.replace(/\s+/g, ' ').trim();
+  // Remove trailing punctuation clutter
+  t = t.replace(/^[\s,.\-—:]+/, '').replace(/[\s,.\-—:]+$/, '');
   // Truncate to ~60 chars at word boundary
   if (t.length > 60) {
     t = t.substring(0, 60).replace(/\s+\S*$/, '') + '…';
@@ -130,6 +131,7 @@ async function loadAgentStats() {
     if (changed) { _lastAgentStatsJSON = json; agentStats = data; }
     if (changed && currentPage === 'dashboard') renderAgents();
     if (currentPage === 'taskmanager') loadTaskManager();
+    if (changed && currentPage === 'orgchart') renderOrgChart();
   } catch(e) { console.error('Failed to load agent stats', e); }
 }
 
@@ -286,7 +288,7 @@ async function loadAgents() {
     const res = await fetch(`${API}/api/agents`);
     const data = await res.json();
     const json = JSON.stringify(data);
-    if (json !== _lastAgentsJSON) { _lastAgentsJSON = json; agents = data; rebuildAgentInfo(); renderAgents(); }
+    if (json !== _lastAgentsJSON) { _lastAgentsJSON = json; agents = data; rebuildAgentInfo(); renderAgents(); if (currentPage === 'orgchart') renderOrgChart(); }
   } catch(e) { console.error('Failed to load agents', e); }
 }
 
@@ -804,9 +806,11 @@ async function loadTaskManager() {
 // ══════════════════════════════════════════════════════════════
 
 function renderOrgChart() {
-  // Stats bar
-  const active = agents.filter(a => a.status === 'busy').length;
-  const idle = agents.filter(a => a.status === 'idle').length;
+  // Stats bar — use both sources for accuracy
+  const activeFromStats = agentStats.filter(s => s.active).length;
+  const activeFromAgents = agents.filter(a => a.status === 'busy').length;
+  const active = Math.max(activeFromStats, activeFromAgents);
+  const idle = agents.length - active;
   const error = agents.filter(a => a.status === 'error').length;
   const statsBar = document.getElementById('orgStatsBar');
   statsBar.innerHTML = `
@@ -818,7 +822,7 @@ function renderOrgChart() {
   `;
 
   const tree = document.getElementById('orgTree');
-  const getStatus = (name) => { const a = agents.find(a => a.name === name); return a ? a.status : 'idle'; };
+  const getStatus = (name) => { const s = agentStats.find(s => s.name === name); if (s && s.active) return 'busy'; const a = agents.find(a => a.name === name); return a ? a.status : 'idle'; };
   const statusDot = (s) => { const color = s === 'busy' ? '#ffab40' : s === 'error' ? '#ff5252' : '#00E676'; return `<span class="dot" style="background:${color};box-shadow:0 0 6px ${color}"></span>`; };
   // Dynamic: derive child agents from live agents data (exclude 'main' which is Mike/COO)
   const childAgents = agents.filter(a => a.name !== 'main').map(a => {
@@ -1530,6 +1534,66 @@ function openSubagentPanel(agentName, evt) {
 }
 
 // ── Helpers ────────────────────────────────────────────────────
+// ── Keyboard Shortcuts ──────────────────────────────────────
+document.addEventListener('keydown', e => {
+  // Don't trigger shortcuts when typing in inputs/textareas
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  // Escape closes modals
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+    const lb = document.getElementById('lightbox');
+    if (lb) lb.classList.remove('open');
+    return;
+  }
+  // Number keys 1-9 navigate to pages
+  const pages = ['dashboard','taskmanager','orgchart','scheduled','workspaces','standups','actions','docs','voice'];
+  const num = parseInt(e.key);
+  if (num >= 1 && num <= 9 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    const page = pages[num - 1];
+    if (page) navigateTo(page);
+  }
+});
+
+// ── Nav Tab Scroll Indicators ───────────────────────────────
+function updateNavScrollIndicators() {
+  const tabs = document.querySelector('.topnav-tabs');
+  if (!tabs) return;
+  const hasRight = tabs.scrollWidth - tabs.scrollLeft - tabs.clientWidth > 4;
+  const hasLeft = tabs.scrollLeft > 4;
+  tabs.classList.toggle('has-overflow-right', hasRight);
+  tabs.classList.toggle('has-overflow-left', hasLeft);
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const tabs = document.querySelector('.topnav-tabs');
+  if (tabs) {
+    tabs.addEventListener('scroll', updateNavScrollIndicators);
+    window.addEventListener('resize', updateNavScrollIndicators);
+    setTimeout(updateNavScrollIndicators, 100);
+  }
+});
+
+// ── API Latency Tracking ────────────────────────────────────
+let _apiLatency = 0;
+const _origFetch = window.fetch;
+window.fetch = async function(...args) {
+  const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
+  if (url.includes('/api/')) {
+    const start = performance.now();
+    const res = await _origFetch.apply(this, args);
+    _apiLatency = Math.round(performance.now() - start);
+    const statusEl = document.getElementById('navStatus');
+    if (statusEl) {
+      const latencyColor = _apiLatency > 500 ? 'var(--red)' : _apiLatency > 200 ? 'var(--orange)' : 'var(--green)';
+      const dot = statusEl.previousElementSibling;
+      if (dot) dot.style.background = latencyColor;
+      const latEl = document.getElementById('navLatency');
+      if (latEl) latEl.textContent = `${_apiLatency}ms`;
+    }
+    return res;
+  }
+  return _origFetch.apply(this, args);
+};
+
 function esc(s) { if (!s) return ''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function timeAgo(iso) { if (!iso) return ''; const diff = (Date.now() - new Date(iso).getTime()) / 1000; if (diff < 0) { const f = -diff; if (f < 60) return 'in <1m'; if (f < 3600) return `in ${Math.floor(f/60)}m`; if (f < 86400) return `in ${Math.floor(f/3600)}h`; return `in ${Math.floor(f/86400)}d`; } if (diff < 60) return 'just now'; if (diff < 3600) return `${Math.floor(diff/60)}m ago`; if (diff < 86400) return `${Math.floor(diff/3600)}h ago`; return `${Math.floor(diff/86400)}d ago`; }
 function formatDuration(secs) { if (!secs) return ''; if (secs < 60) return `${Math.round(secs)}s`; if (secs < 3600) return `${Math.floor(secs/60)}m ${Math.round(secs%60)}s`; return `${Math.floor(secs/3600)}h ${Math.floor((secs%3600)/60)}m`; }
