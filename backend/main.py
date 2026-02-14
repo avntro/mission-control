@@ -731,6 +731,12 @@ def index():
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+# ── SPA catch-all (must be AFTER all API routes and static mount) ──
+@app.get("/{full_path:path}")
+def spa_catch_all(full_path: str):
+    """Serve index.html for any non-API, non-static route (SPA client-side routing)"""
+    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=3335, reload=True)

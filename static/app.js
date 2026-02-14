@@ -28,11 +28,30 @@ async function loadAll() {
 }
 
 // ── Navigation ─────────────────────────────────────────────────
-function navigateTo(page) {
+// URL path → page mapping
+const PATH_TO_PAGE = {
+  '/': 'dashboard', '/dashboard': 'dashboard',
+  '/task-manager': 'taskmanager', '/taskmanager': 'taskmanager',
+  '/org-chart': 'orgchart', '/orgchart': 'orgchart',
+  '/scheduled-tasks': 'scheduled', '/scheduled': 'scheduled',
+  '/workspaces': 'workspaces',
+  '/standups': 'standups',
+};
+const PAGE_TO_PATH = {
+  'dashboard': '/', 'taskmanager': '/task-manager', 'orgchart': '/org-chart',
+  'scheduled': '/scheduled-tasks', 'workspaces': '/workspaces', 'standups': '/standups',
+};
+
+function navigateTo(page, pushState = true) {
   currentPage = page;
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.page === page));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === `page-${page}`));
   
+  if (pushState) {
+    const path = PAGE_TO_PATH[page] || '/';
+    history.pushState({ page }, '', path);
+  }
+
   // Load page-specific data
   if (page === 'taskmanager') loadTaskManager();
   if (page === 'orgchart') renderOrgChart();
@@ -40,6 +59,22 @@ function navigateTo(page) {
   if (page === 'workspaces') loadWorkspaces();
   if (page === 'standups') loadStandups();
 }
+
+// Handle browser back/forward
+window.addEventListener('popstate', (e) => {
+  const page = (e.state && e.state.page) || PATH_TO_PAGE[location.pathname] || 'dashboard';
+  navigateTo(page, false);
+});
+
+// On initial load, resolve page from URL
+(function initRoute() {
+  const page = PATH_TO_PAGE[location.pathname] || 'dashboard';
+  if (page !== 'dashboard') {
+    navigateTo(page, false);
+  }
+  // Replace state for initial page
+  history.replaceState({ page }, '', PAGE_TO_PATH[page] || '/');
+})();
 
 // ══════════════════════════════════════════════════════════════
 // DASHBOARD (original kanban)
@@ -721,11 +756,11 @@ function renderGpuWidget(g) {
     </div>
     <div class="gpu-row">
       <span class="gpu-label">GPU Clock</span>
-      <span class="gpu-value">${g.sclk != null ? g.sclk + ' MHz' : '—'}</span>
+      <span class="gpu-value">${g.sclk != null ? g.sclk + ' MHz' : 'N/A'}</span>
     </div>
     <div class="gpu-row">
       <span class="gpu-label">MEM Clock</span>
-      <span class="gpu-value">${g.mclk != null ? g.mclk + ' MHz' : '—'}</span>
+      <span class="gpu-value">${g.mclk != null ? g.mclk + ' MHz' : 'N/A'}</span>
     </div>
   `;
 }
