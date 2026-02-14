@@ -16,7 +16,7 @@ services:
     environment:
       - MC_DB=/data/mission_control.db
       - GATEWAY_URL=https://100.101.174.1:18789
-      - GATEWAY_TOKEN=bravo2025
+      - GATEWAY_TOKEN=cc5f17fcf98169066f5e248bc2576676feea61d8d84b1ffc
       - OPENCLAW_HOME=/home/pc1/.openclaw
       - DOCS_PATH=/home/pc1/pc1-docs
 

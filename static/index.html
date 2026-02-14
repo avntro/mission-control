@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="Mission Ctrl">
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-<link rel="stylesheet" href="/static/style.css?v=20260214c">
+<link rel="stylesheet" href="/static/style.css?v=20260214ac">
 </head>
 <body>
 
@@ -38,8 +38,6 @@
     <button class="nav-tab" data-page="actions" onclick="navigateTo('actions')">☑️ Actions</button>
     <button class="nav-tab" data-page="docs" onclick="navigateTo('docs')">📚 Docs</button>
     <button class="nav-tab" data-page="reports" onclick="navigateTo('reports')">📊 Reports</button>
-    <button class="nav-tab" data-page="costs" onclick="navigateTo('costs')">💰 Costs</button>
-    <button class="nav-tab" data-page="chat" onclick="navigateTo('chat')">💬 Chat</button>
     <button class="nav-tab" data-page="voice" onclick="navigateTo('voice')">🎤 Voice</button>
   </div>
   <div class="topnav-right">
@@ -250,42 +248,6 @@
   </div>
 </div>
 
-<!-- PAGE: Cost Dashboard -->
-<div class="page" id="page-costs">
-  <div class="page-header"><div><h2>💰 Cost Dashboard</h2><p class="page-subtitle">Token usage and cost tracking across agents</p></div></div>
-  <div class="cost-summary-cards" id="costSummaryCards"></div>
-  <div class="cost-layout">
-    <div class="cost-chart-section">
-      <h3 style="margin-bottom:12px">📊 Daily Token Usage</h3>
-      <div id="costDailyChart" class="cost-chart"></div>
-    </div>
-    <div class="cost-agents-section">
-      <h3 style="margin-bottom:12px">🤖 Per-Agent Breakdown</h3>
-      <div id="costAgentBreakdown"></div>
-    </div>
-  </div>
-</div>
-
-<!-- PAGE: Chat -->
-<div class="page" id="page-chat">
-  <div class="page-header"><div><h2>💬 Agent Chat</h2><p class="page-subtitle">Chat directly with your agents</p></div></div>
-  <div class="chat-layout">
-    <aside class="chat-sidebar">
-      <div class="ws-section-title">AGENTS</div>
-      <div id="chatAgentList"></div>
-    </aside>
-    <main class="chat-main">
-      <div class="chat-messages" id="chatMessages">
-        <div class="ws-placeholder"><span>💬</span><p>Select an agent to start chatting</p></div>
-      </div>
-      <div class="chat-input-bar" id="chatInputBar" style="display:none">
-        <textarea id="chatInput" placeholder="Type a message..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
-        <button class="btn btn-primary" onclick="sendChat()" id="chatSendBtn">Send</button>
-      </div>
-    </main>
-  </div>
-</div>
-
 <!-- PAGE: Voice (placeholder) -->
 <div class="page" id="page-voice">
   <div class="page-header"><div><h2>🎤 Voice Assistant</h2><p class="page-subtitle">Voice interaction with agents (coming soon)</p></div></div>
@@ -365,7 +327,7 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=20260214c"></script>
+<script src="/static/app.js?v=20260214af"></script>
 <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js', {scope: '/'});</script>
 </body>
 </html>
