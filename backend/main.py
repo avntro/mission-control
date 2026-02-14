@@ -24,6 +24,9 @@ class TaskCreate(BaseModel):
     assigned_agent: str = ""
     priority: str = "medium"
     status: str = "todo"
+    model: str = ""
+    cost: float = 0
+    tokens: int = 0
 
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
@@ -31,6 +34,9 @@ class TaskUpdate(BaseModel):
     assigned_agent: Optional[str] = None
     priority: Optional[str] = None
     status: Optional[str] = None
+    model: Optional[str] = None
+    cost: Optional[float] = None
+    tokens: Optional[int] = None
 
 class CommentCreate(BaseModel):
     task_id: str
@@ -114,7 +120,10 @@ def init_db():
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         completed_at TEXT,
-        duration REAL
+        duration REAL,
+        model TEXT DEFAULT '',
+        cost REAL DEFAULT 0,
+        tokens INTEGER DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS comments (
         id TEXT PRIMARY KEY,
@@ -184,6 +193,13 @@ def init_db():
         FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
     );
     """)
+    # Migrations — add columns if missing
+    for col, typ in [("model", "TEXT DEFAULT ''"), ("cost", "REAL DEFAULT 0"), ("tokens", "INTEGER DEFAULT 0")]:
+        try:
+            conn.execute(f"ALTER TABLE tasks ADD COLUMN {col} {typ}")
+        except Exception:
+            pass
+    conn.commit()
     # Seed agents if empty
     existing = conn.execute("SELECT COUNT(*) FROM agents").fetchone()[0]
     if existing == 0:
@@ -360,8 +376,8 @@ def create_task(t: TaskCreate):
     tid = str(uuid.uuid4())[:8]
     ts = now_iso()
     conn.execute(
-        "INSERT INTO tasks (id, title, description, assigned_agent, priority, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
-        (tid, t.title, t.description, t.assigned_agent, t.priority, t.status, ts, ts)
+        "INSERT INTO tasks (id, title, description, assigned_agent, priority, status, model, cost, tokens, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        (tid, t.title, t.description, t.assigned_agent, t.priority, t.status, t.model, t.cost, t.tokens, ts, ts)
     )
     add_activity(conn, t.assigned_agent, "task_created", f"Created: {t.title}", tid)
     conn.commit()
@@ -378,7 +394,7 @@ def update_task(task_id: str, t: TaskUpdate):
         raise HTTPException(404, "Task not found")
     old = dict(row)
     updates = {}
-    for field in ["title", "description", "assigned_agent", "priority", "status"]:
+    for field in ["title", "description", "assigned_agent", "priority", "status", "model", "cost", "tokens"]:
         val = getattr(t, field)
         if val is not None:
             updates[field] = val
