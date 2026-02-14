@@ -1377,10 +1377,10 @@ def get_live_tasks():
                                     if isinstance(content, list):
                                         for c in content:
                                             if isinstance(c, dict) and c.get("type") == "text":
-                                                title = c["text"][:300]
+                                                title = c["text"][:3000]
                                                 break
                                     elif isinstance(content, str):
-                                        title = content[:300]
+                                        title = content[:3000]
                         except json.JSONDecodeError:
                             continue
                         if title and started_at:
@@ -1546,7 +1546,7 @@ def get_live_tasks():
             tasks_list.append({
                 "id": f"live-{sid[:8]}",
                 "title": clean_title,
-                "description": full_description[:1000],
+                "description": full_description[:3000],
                 "assigned_agent": agent_name,
                 "status": status,
                 "priority": "medium",

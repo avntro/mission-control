@@ -434,8 +434,9 @@ body{
 
 /* ── Responsive ─────────────────────────────────────────────── */
 @media(max-width:1024px){
-  html{height:auto!important;min-height:100vh!important;overflow-y:auto!important;overflow-x:hidden!important}
-  body{height:auto!important;min-height:100vh!important;overflow-y:auto!important;overflow-x:hidden!important}
+  html{height:auto!important;min-height:100vh!important;overflow-y:scroll!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch!important}
+  body{height:auto!important;min-height:100vh!important;overflow-y:visible!important;overflow-x:hidden!important}
+  *{-webkit-overflow-scrolling:touch}
   .page{overflow-y:visible;flex:none}
   .page.active{display:flex;flex-direction:column;flex:none}
   .layout{overflow:visible!important;flex:none!important}
