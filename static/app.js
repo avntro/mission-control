@@ -220,8 +220,9 @@ async function loadTasks() {
 
 function renderBoard() {
   const cols = { todo: [], in_progress: [], review: [], done: [] };
-  // Add DB tasks
-  tasks.forEach(t => { const s = t.status in cols ? t.status : 'todo'; cols[s].push(t); });
+  // Add DB tasks (skip IDs that exist in live tasks — live has richer data)
+  const liveIds = new Set(liveTasks.map(t => t.id));
+  tasks.forEach(t => { if (!liveIds.has(t.id)) { const s = t.status in cols ? t.status : 'todo'; cols[s].push(t); } });
   // Add live tasks (from session files)
   liveTasks.forEach(t => { const s = t.status in cols ? t.status : 'in_progress'; cols[s].push(t); });
   const CARD_LIMIT = 8;

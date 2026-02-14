@@ -1142,7 +1142,7 @@ def approve_task(task_id: str):
 
 @app.post("/api/tasks/{task_id}/reject")
 def reject_task(task_id: str):
-    """Move a task from review back to in_progress (needs rework)."""
+    """Move a task from review back to todo (needs rework). Preserves all session metadata."""
     conn = get_db()
     row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
     ts = now_iso()
@@ -1151,11 +1151,32 @@ def reject_task(task_id: str):
                      (ts, task_id))
         add_activity(conn, row["assigned_agent"] or "user", "task_rejected", f"Rejected: {row['title']}", task_id)
     else:
+        # For live tasks, try to pull session metadata so the DB row isn't empty
+        live_data = {}
+        try:
+            live_list = get_live_tasks(agents="all")
+            for lt in live_list:
+                if lt["id"] == task_id:
+                    live_data = lt
+                    break
+        except Exception:
+            pass
         conn.execute(
-            "INSERT INTO tasks (id, title, description, assigned_agent, priority, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
-            (task_id, "Rejected task", "", "", "medium", "todo", ts, ts)
+            "INSERT INTO tasks (id, title, description, assigned_agent, priority, status, model, cost, tokens, duration, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (task_id,
+             live_data.get("title", "Rejected task"),
+             live_data.get("description", ""),
+             live_data.get("assigned_agent", ""),
+             live_data.get("priority", "medium"),
+             "todo",
+             live_data.get("model", ""),
+             live_data.get("cost", 0),
+             live_data.get("tokens", 0),
+             live_data.get("duration"),
+             live_data.get("created_at", ts),
+             ts)
         )
-        add_activity(conn, "user", "task_rejected", f"Rejected: {task_id}", task_id)
+        add_activity(conn, live_data.get("assigned_agent", "user"), "task_rejected", f"Rejected: {live_data.get('title', task_id)}", task_id)
     conn.commit()
     conn.close()
     return {"ok": True, "status": "todo"}
