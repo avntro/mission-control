@@ -1,4 +1,4 @@
-"""Mission Control — FastAPI Backend (Phase 2)"""
+"""Mission Control — FastAPI Backend (Phase 3)"""
 import os, json, time, uuid, sqlite3, glob, httpx
 from datetime import datetime, timezone
 from typing import Optional, List
@@ -14,6 +14,7 @@ DB_PATH = os.environ.get("MC_DB", "/data/mission_control.db")
 GATEWAY_URL = os.environ.get("GATEWAY_URL", "https://100.101.174.1:18789")
 GATEWAY_TOKEN = os.environ.get("GATEWAY_TOKEN", "")
 OPENCLAW_HOME = os.environ.get("OPENCLAW_HOME", "/home/pc1/.openclaw")
+DOCS_PATH = os.environ.get("DOCS_PATH", "/home/pc1/pc1-docs")
 
 # ── Models ──────────────────────────────────────────────────────
 class TaskCreate(BaseModel):
@@ -67,6 +68,19 @@ class StandupMessageCreate(BaseModel):
 class ActionItemUpdate(BaseModel):
     completed: Optional[bool] = None
     assignee: Optional[str] = None
+
+class FileWriteRequest(BaseModel):
+    content: str
+
+class ActionItemCreate(BaseModel):
+    text: str
+    assignee: str = ""
+    standup_id: str = ""
+
+class ActionItemPatch(BaseModel):
+    completed: Optional[bool] = None
+    assignee: Optional[str] = None
+    text: Optional[str] = None
 
 # ── DB Setup ────────────────────────────────────────────────────
 def get_db():
@@ -138,6 +152,15 @@ def init_db():
         created_at TEXT NOT NULL,
         FOREIGN KEY (standup_id) REFERENCES standups(id) ON DELETE CASCADE
     );
+    CREATE TABLE IF NOT EXISTS action_items (
+        id TEXT PRIMARY KEY,
+        text TEXT NOT NULL,
+        assignee TEXT DEFAULT '',
+        completed INTEGER DEFAULT 0,
+        standup_id TEXT DEFAULT '',
+        created_at TEXT NOT NULL,
+        completed_at TEXT
+    );
     """)
     # Seed agents if empty
     existing = conn.execute("SELECT COUNT(*) FROM agents").fetchone()[0]
@@ -178,24 +201,18 @@ GPU_STATS_FILE = "/data/gpu_stats.json"
 
 @app.get("/api/gpu")
 def get_gpu_stats():
-    """Read GPU stats from rocm-smi JSON output (written by host gpu-stats.sh)"""
     try:
         with open(GPU_STATS_FILE, "r") as f:
             raw = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         raise HTTPException(503, "GPU stats not available")
-
-    # Parse the rocm-smi JSON format
     card = raw.get("card0", {})
     vram_total = int(card.get("VRAM Total Memory (B)", 0))
     vram_used = int(card.get("VRAM Total Used Memory (B)", 0))
-
-    # Parse clock speeds - format: "(2541Mhz)"
     sclk_raw = card.get("sclk clock speed:", "")
     mclk_raw = card.get("mclk clock speed:", "")
     sclk = int(sclk_raw.strip("()Mhz")) if sclk_raw else None
     mclk = int(mclk_raw.strip("()Mhz")) if mclk_raw else None
-
     return {
         "gpu_use": int(card.get("GPU use (%)", 0)),
         "temp": float(card.get("Temperature (Sensor edge) (C)", 0)),
@@ -209,33 +226,29 @@ def get_gpu_stats():
 # ── Gateway Proxy ───────────────────────────────────────────────
 @app.get("/api/gateway/sessions")
 async def gateway_sessions():
-    """Proxy to gateway API to get session data"""
     try:
         async with httpx.AsyncClient(verify=False, timeout=10) as client:
             headers = {"Authorization": f"Bearer {GATEWAY_TOKEN}"} if GATEWAY_TOKEN else {}
-            # Try the sessions endpoint
             resp = await client.get(f"{GATEWAY_URL}/api/sessions", headers=headers)
             if resp.status_code == 200:
                 return resp.json()
-            # Try with basic auth
             resp = await client.get(f"{GATEWAY_URL}/api/sessions",
                                      auth=("admin", GATEWAY_TOKEN))
             if resp.status_code == 200:
                 return resp.json()
-    except Exception as e:
+    except Exception:
         pass
     return []
 
 @app.get("/api/gateway/agents")
 async def gateway_agents():
-    """Proxy to gateway API to get agent config"""
     try:
         async with httpx.AsyncClient(verify=False, timeout=10) as client:
             headers = {"Authorization": f"Bearer {GATEWAY_TOKEN}"} if GATEWAY_TOKEN else {}
             resp = await client.get(f"{GATEWAY_URL}/api/agents", headers=headers)
             if resp.status_code == 200:
                 return resp.json()
-    except Exception as e:
+    except Exception:
         pass
     return []
 
@@ -396,159 +409,43 @@ def list_activity(agent: Optional[str] = None, limit: int = 50):
     conn.close()
     return [dict(r) for r in rows]
 
-# ── Scheduled Tasks (cron jobs from system) ─────────────────────
+# ── Scheduled Tasks ─────────────────────────────────────────────
 @app.get("/api/scheduled-tasks")
 def get_scheduled_tasks():
-    """Return scheduled/cron tasks - defined statically for our agents"""
     tasks = [
-        {
-            "id": "daily-memory-backup",
-            "title": "Daily Memory Backup",
-            "description": "Backup all agent MEMORY.md files",
-            "schedule": "0 3 * * *",
-            "schedule_human": "Daily at 3:00 AM",
-            "type": "daily",
-            "status": "active",
-            "agent": "it-support",
-            "last_run": None,
-            "icon": "💾"
-        },
-        {
-            "id": "trading-market-scan",
-            "title": "Market Open Scan",
-            "description": "Scan markets at opening for trading signals",
-            "schedule": "30 9 * * 1-5",
-            "schedule_human": "Mon-Fri at 9:30 AM",
-            "type": "daily",
-            "status": "active",
-            "agent": "trading",
-            "last_run": None,
-            "icon": "📊"
-        },
-        {
-            "id": "trading-close-review",
-            "title": "Market Close Review",
-            "description": "Review positions and P&L at market close",
-            "schedule": "0 16 * * 1-5",
-            "schedule_human": "Mon-Fri at 4:00 PM",
-            "type": "daily",
-            "status": "active",
-            "agent": "trading",
-            "last_run": None,
-            "icon": "📈"
-        },
-        {
-            "id": "health-check",
-            "title": "System Health Check",
-            "description": "Check all services, Docker containers, and disk space",
-            "schedule": "*/30 * * * *",
-            "schedule_human": "Every 30 minutes",
-            "type": "daily",
-            "status": "active",
-            "agent": "it-support",
-            "last_run": None,
-            "icon": "🏥"
-        },
-        {
-            "id": "overnight-summary",
-            "title": "Overnight Activity Summary",
-            "description": "Compile overnight agent activity into daily report",
-            "schedule": "0 7 * * *",
-            "schedule_human": "Daily at 7:00 AM",
-            "type": "daily",
-            "status": "active",
-            "agent": "main",
-            "last_run": None,
-            "icon": "🌅"
-        },
-        {
-            "id": "weekly-standup",
-            "title": "Weekly Team Standup",
-            "description": "Auto-trigger weekly standup summary for all agents",
-            "schedule": "0 9 * * 1",
-            "schedule_human": "Monday at 9:00 AM",
-            "type": "weekly",
-            "status": "active",
-            "agent": "main",
-            "last_run": None,
-            "icon": "📋"
-        },
-        {
-            "id": "weekly-performance",
-            "title": "Weekly Performance Report",
-            "description": "Aggregate token usage, costs, task completion rates",
-            "schedule": "0 18 * * 5",
-            "schedule_human": "Friday at 6:00 PM",
-            "type": "weekly",
-            "status": "active",
-            "agent": "dev",
-            "last_run": None,
-            "icon": "📊"
-        },
-        {
-            "id": "weekly-backup",
-            "title": "Weekly Full Backup",
-            "description": "Full backup of all workspaces and databases",
-            "schedule": "0 2 * * 0",
-            "schedule_human": "Sunday at 2:00 AM",
-            "type": "weekly",
-            "status": "active",
-            "agent": "it-support",
-            "last_run": None,
-            "icon": "💿"
-        },
+        {"id":"daily-memory-backup","title":"Daily Memory Backup","description":"Backup all agent MEMORY.md files","schedule":"0 3 * * *","schedule_human":"Daily at 3:00 AM","type":"daily","status":"active","agent":"it-support","last_run":None,"icon":"💾"},
+        {"id":"trading-market-scan","title":"Market Open Scan","description":"Scan markets at opening for trading signals","schedule":"30 9 * * 1-5","schedule_human":"Mon-Fri at 9:30 AM","type":"daily","status":"active","agent":"trading","last_run":None,"icon":"📊"},
+        {"id":"trading-close-review","title":"Market Close Review","description":"Review positions and P&L at market close","schedule":"0 16 * * 1-5","schedule_human":"Mon-Fri at 4:00 PM","type":"daily","status":"active","agent":"trading","last_run":None,"icon":"📈"},
+        {"id":"health-check","title":"System Health Check","description":"Check all services, Docker containers, and disk space","schedule":"*/30 * * * *","schedule_human":"Every 30 minutes","type":"daily","status":"active","agent":"it-support","last_run":None,"icon":"🏥"},
+        {"id":"overnight-summary","title":"Overnight Activity Summary","description":"Compile overnight agent activity into daily report","schedule":"0 7 * * *","schedule_human":"Daily at 7:00 AM","type":"daily","status":"active","agent":"main","last_run":None,"icon":"🌅"},
+        {"id":"weekly-standup","title":"Weekly Team Standup","description":"Auto-trigger weekly standup summary for all agents","schedule":"0 9 * * 1","schedule_human":"Monday at 9:00 AM","type":"weekly","status":"active","agent":"main","last_run":None,"icon":"📋"},
+        {"id":"weekly-performance","title":"Weekly Performance Report","description":"Aggregate token usage, costs, task completion rates","schedule":"0 18 * * 5","schedule_human":"Friday at 6:00 PM","type":"weekly","status":"active","agent":"dev","last_run":None,"icon":"📊"},
+        {"id":"weekly-backup","title":"Weekly Full Backup","description":"Full backup of all workspaces and databases","schedule":"0 2 * * 0","schedule_human":"Sunday at 2:00 AM","type":"weekly","status":"active","agent":"it-support","last_run":None,"icon":"💿"},
     ]
     return tasks
 
 # ── Overnight Log ───────────────────────────────────────────────
 @app.get("/api/overnight-log")
 def get_overnight_log():
-    """Return overnight activity log entries"""
     conn = get_db()
-    # Get last 24h of activity
-    rows = conn.execute(
-        "SELECT * FROM activity_feed ORDER BY created_at DESC LIMIT 20"
-    ).fetchall()
+    rows = conn.execute("SELECT * FROM activity_feed ORDER BY created_at DESC LIMIT 20").fetchall()
     conn.close()
-    
     entries = []
     for r in rows:
         d = dict(r)
         entries.append({
-            "id": d["id"],
-            "title": d["action"].replace("_", " ").title(),
-            "description": d["details"] or "No details",
-            "agent": d["agent"],
-            "tag": d["action"],
-            "time": d["created_at"],
-            "success": d["success"]
+            "id": d["id"], "title": d["action"].replace("_", " ").title(),
+            "description": d["details"] or "No details", "agent": d["agent"],
+            "tag": d["action"], "time": d["created_at"], "success": d["success"]
         })
-    
-    # Add some static example entries if empty
     if not entries:
         entries = [
-            {
-                "id": "example-1",
-                "title": "System Health Check ✅",
-                "description": "All services healthy. Docker containers running. Disk usage at 45%.",
-                "agent": "it-support",
-                "tag": "health_check",
-                "time": now_iso(),
-                "success": 1
-            },
-            {
-                "id": "example-2",
-                "title": "Dashboard Update 🔧",
-                "description": "Mission Control Phase 2 features deployed successfully.",
-                "agent": "dev",
-                "tag": "deployment",
-                "time": now_iso(),
-                "success": 1
-            },
+            {"id":"example-1","title":"System Health Check ✅","description":"All services healthy.","agent":"it-support","tag":"health_check","time":now_iso(),"success":1},
+            {"id":"example-2","title":"Dashboard Update 🔧","description":"Mission Control Phase 3 deployed.","agent":"dev","tag":"deployment","time":now_iso(),"success":1},
         ]
     return entries
 
-# ── Workspaces (file browser) ──────────────────────────────────
+# ── Workspaces (file browser + editor) ──────────────────────────
 WORKSPACE_MAP = {
     "main": {"path": "workspace", "name": "Mike (Main)", "emoji": "🎯"},
     "trading": {"path": "workspace-trading", "name": "Trading / AA", "emoji": "📈"},
@@ -576,11 +473,8 @@ def list_workspaces():
                     "modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
                 })
         result.append({
-            "agent": agent_id,
-            "name": info["name"],
-            "emoji": info["emoji"],
-            "path": ws_path,
-            "files": files
+            "agent": agent_id, "name": info["name"], "emoji": info["emoji"],
+            "path": ws_path, "files": files
         })
     return result
 
@@ -596,7 +490,45 @@ def read_workspace_file(agent_id: str, filename: str):
         raise HTTPException(404, "File not found")
     with open(fpath, "r", encoding="utf-8", errors="replace") as f:
         content = f.read()
-    return {"content": content, "filename": filename, "agent": agent_id}
+    stat = os.stat(fpath)
+    return {
+        "content": content, "filename": filename, "agent": agent_id,
+        "modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+        "size": stat.st_size
+    }
+
+@app.put("/api/workspaces/{agent_id}/{filename}")
+def write_workspace_file(agent_id: str, filename: str, body: FileWriteRequest):
+    if agent_id not in WORKSPACE_MAP:
+        raise HTTPException(404, "Agent not found")
+    if filename not in ALLOWED_FILES:
+        raise HTTPException(403, "File not allowed")
+    ws_path = os.path.join(OPENCLAW_HOME, WORKSPACE_MAP[agent_id]["path"])
+    fpath = os.path.join(ws_path, filename)
+    with open(fpath, "w", encoding="utf-8") as f:
+        f.write(body.content)
+    return {"ok": True, "size": len(body.content)}
+
+# ── Workspace change detection (polling) ────────────────────────
+@app.get("/api/workspaces/changes")
+def workspace_changes(since: Optional[str] = None):
+    """Return files modified since given ISO timestamp"""
+    if not since:
+        return {"changed": False, "files": []}
+    try:
+        since_ts = datetime.fromisoformat(since).timestamp()
+    except:
+        return {"changed": False, "files": []}
+    changed_files = []
+    for agent_id, info in WORKSPACE_MAP.items():
+        ws_path = os.path.join(OPENCLAW_HOME, info["path"])
+        for fname in ALLOWED_FILES:
+            fpath = os.path.join(ws_path, fname)
+            if os.path.exists(fpath):
+                mtime = os.stat(fpath).st_mtime
+                if mtime > since_ts:
+                    changed_files.append({"agent": agent_id, "file": fname, "modified": datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat()})
+    return {"changed": len(changed_files) > 0, "files": changed_files}
 
 # ── Standups ────────────────────────────────────────────────────
 @app.get("/api/standups")
@@ -673,6 +605,136 @@ def update_standup_message(message_id: str, a: ActionItemUpdate):
     conn.close()
     return {"ok": True}
 
+# ── Action Items (standalone checklist) ─────────────────────────
+@app.get("/api/action-items")
+def list_action_items(completed: Optional[bool] = None):
+    conn = get_db()
+    q = "SELECT * FROM action_items"
+    params = []
+    if completed is not None:
+        q += " WHERE completed = ?"
+        params.append(1 if completed else 0)
+    q += " ORDER BY completed ASC, created_at DESC"
+    rows = conn.execute(q, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+@app.post("/api/action-items")
+def create_action_item(item: ActionItemCreate):
+    conn = get_db()
+    aid = str(uuid.uuid4())[:8]
+    ts = now_iso()
+    conn.execute(
+        "INSERT INTO action_items (id, text, assignee, completed, standup_id, created_at) VALUES (?,?,?,0,?,?)",
+        (aid, item.text, item.assignee, item.standup_id, ts)
+    )
+    conn.commit()
+    conn.close()
+    return {"id": aid}
+
+@app.patch("/api/action-items/{item_id}")
+def update_action_item(item_id: str, patch: ActionItemPatch):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM action_items WHERE id = ?", (item_id,)).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(404, "Action item not found")
+    updates = {}
+    if patch.completed is not None:
+        updates["completed"] = 1 if patch.completed else 0
+        if patch.completed:
+            updates["completed_at"] = now_iso()
+        else:
+            updates["completed_at"] = None
+    if patch.assignee is not None:
+        updates["assignee"] = patch.assignee
+    if patch.text is not None:
+        updates["text"] = patch.text
+    if updates:
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        vals = list(updates.values()) + [item_id]
+        conn.execute(f"UPDATE action_items SET {set_clause} WHERE id = ?", vals)
+        conn.commit()
+    row = conn.execute("SELECT * FROM action_items WHERE id = ?", (item_id,)).fetchone()
+    conn.close()
+    return dict(row)
+
+@app.delete("/api/action-items/{item_id}")
+def delete_action_item(item_id: str):
+    conn = get_db()
+    conn.execute("DELETE FROM action_items WHERE id = ?", (item_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+# ── Docs (browse pc1-docs) ──────────────────────────────────────
+@app.get("/api/docs")
+def list_docs(q: Optional[str] = None):
+    """List all markdown docs, optionally filtered by search query"""
+    docs_dir = os.path.join(DOCS_PATH, "docs")
+    if not os.path.isdir(docs_dir):
+        return []
+    results = []
+    for fname in sorted(os.listdir(docs_dir)):
+        if not fname.endswith(".md"):
+            continue
+        fpath = os.path.join(docs_dir, fname)
+        stat = os.stat(fpath)
+        title = fname.replace(".md", "").replace("-", " ").title()
+        # Read first line for title if it starts with #
+        try:
+            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                first_line = f.readline().strip()
+                if first_line.startswith("# "):
+                    title = first_line[2:].strip()
+                # Search within content if query provided
+                if q:
+                    f.seek(0)
+                    content = f.read().lower()
+                    if q.lower() not in content and q.lower() not in fname.lower():
+                        continue
+        except:
+            pass
+        results.append({
+            "filename": fname,
+            "title": title,
+            "size": stat.st_size,
+            "modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
+        })
+    # Also include README.md from root
+    readme_path = os.path.join(DOCS_PATH, "README.md")
+    if os.path.exists(readme_path):
+        stat = os.stat(readme_path)
+        include = True
+        if q:
+            try:
+                with open(readme_path, "r") as f:
+                    if q.lower() not in f.read().lower():
+                        include = False
+            except:
+                include = False
+        if include:
+            results.insert(0, {
+                "filename": "README.md",
+                "title": "README",
+                "size": stat.st_size,
+                "modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
+            })
+    return results
+
+@app.get("/api/docs/{filename}")
+def read_doc(filename: str):
+    """Read a specific doc file"""
+    # Try docs/ subdirectory first, then root
+    fpath = os.path.join(DOCS_PATH, "docs", filename)
+    if not os.path.exists(fpath):
+        fpath = os.path.join(DOCS_PATH, filename)
+    if not os.path.exists(fpath) or not filename.endswith(".md"):
+        raise HTTPException(404, "Doc not found")
+    with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+        content = f.read()
+    return {"filename": filename, "content": content}
+
 # ── Webhook (OpenClaw integration) ─────────────────────────────
 @app.post("/api/webhook/openclaw")
 def openclaw_webhook(event: WebhookEvent):
@@ -731,10 +793,8 @@ def index():
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# ── SPA catch-all (must be AFTER all API routes and static mount) ──
 @app.get("/{full_path:path}")
 def spa_catch_all(full_path: str):
-    """Serve index.html for any non-API, non-static route (SPA client-side routing)"""
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
 if __name__ == "__main__":

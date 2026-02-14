@@ -9,6 +9,14 @@
 </head>
 <body>
 
+<!-- Webcam placeholder overlay -->
+<div class="webcam-overlay" id="webcamOverlay">
+  <div class="webcam-placeholder">
+    <span>📹</span>
+    <small>Webcam</small>
+  </div>
+</div>
+
 <!-- Top Navigation -->
 <nav class="topnav">
   <div class="topnav-left">
@@ -19,9 +27,12 @@
     <button class="nav-tab active" data-page="dashboard" onclick="navigateTo('dashboard')">📊 Dashboard</button>
     <button class="nav-tab" data-page="taskmanager" onclick="navigateTo('taskmanager')">🖥️ Task Manager</button>
     <button class="nav-tab" data-page="orgchart" onclick="navigateTo('orgchart')">🏢 Org Chart</button>
-    <button class="nav-tab" data-page="scheduled" onclick="navigateTo('scheduled')">⏰ Scheduled Tasks</button>
+    <button class="nav-tab" data-page="scheduled" onclick="navigateTo('scheduled')">⏰ Scheduled</button>
     <button class="nav-tab" data-page="workspaces" onclick="navigateTo('workspaces')">📁 Workspaces</button>
     <button class="nav-tab" data-page="standups" onclick="navigateTo('standups')">💬 Standups</button>
+    <button class="nav-tab" data-page="actions" onclick="navigateTo('actions')">☑️ Actions</button>
+    <button class="nav-tab" data-page="docs" onclick="navigateTo('docs')">📚 Docs</button>
+    <button class="nav-tab" data-page="voice" onclick="navigateTo('voice')">🎤 Voice</button>
   </div>
   <div class="topnav-right">
     <span class="dot dot-green"></span>
@@ -30,22 +41,19 @@
 </nav>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
-<!-- PAGE: Dashboard (original kanban) -->
+<!-- PAGE: Dashboard -->
 <!-- ═══════════════════════════════════════════════════════════ -->
 <div class="page active" id="page-dashboard">
   <div class="page-header">
     <h2>📋 Dashboard</h2>
     <button class="btn btn-primary" onclick="openCreateModal()">+ New Task</button>
   </div>
-
   <div class="layout">
     <aside class="sidebar" id="agentsPanel">
       <h2>🤖 Agents</h2>
       <div id="agentsList"></div>
       <h2 style="margin-top:20px">🎮 GPU Stats</h2>
-      <div id="gpuWidget" class="gpu-widget">
-        <div class="gpu-loading">Loading...</div>
-      </div>
+      <div id="gpuWidget" class="gpu-widget"><div class="gpu-loading">Loading...</div></div>
     </aside>
     <main class="main">
       <div class="tabs">
@@ -90,144 +98,113 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════ -->
 <!-- PAGE: Task Manager -->
-<!-- ═══════════════════════════════════════════════════════════ -->
 <div class="page" id="page-taskmanager">
   <div class="page-header">
-    <div>
-      <h2>🖥️ Task Manager</h2>
-      <p class="page-subtitle">Agent fleet overview and session tracking</p>
-    </div>
+    <div><h2>🖥️ Task Manager</h2><p class="page-subtitle">Agent fleet overview and session tracking</p></div>
   </div>
-
-  <!-- Stats Bar -->
   <div class="stats-bar" id="statsBar">
-    <div class="stat-card">
-      <span class="stat-dot" style="background:#6c63ff"></span>
-      <div class="stat-info">
-        <span class="stat-number" id="stat-total">6</span>
-        <span class="stat-label">Total Agents</span>
-      </div>
-    </div>
-    <div class="stat-card">
-      <span class="stat-dot" style="background:#00E676"></span>
-      <div class="stat-info">
-        <span class="stat-number" id="stat-active">0</span>
-        <span class="stat-label">Active</span>
-      </div>
-    </div>
-    <div class="stat-card">
-      <span class="stat-dot" style="background:#00bcd4"></span>
-      <div class="stat-info">
-        <span class="stat-number" id="stat-idle">6</span>
-        <span class="stat-label">Idle</span>
-      </div>
-    </div>
-    <div class="stat-card">
-      <span class="stat-dot" style="background:#ffab40"></span>
-      <div class="stat-info">
-        <span class="stat-number" id="stat-busy">0</span>
-        <span class="stat-label">Busy</span>
-      </div>
-    </div>
-    <div class="stat-card">
-      <span class="stat-dot" style="background:#ff5252"></span>
-      <div class="stat-info">
-        <span class="stat-number" id="stat-error">0</span>
-        <span class="stat-label">Error</span>
-      </div>
-    </div>
+    <div class="stat-card"><span class="stat-dot" style="background:#6c63ff"></span><div class="stat-info"><span class="stat-number" id="stat-total">6</span><span class="stat-label">Total Agents</span></div></div>
+    <div class="stat-card"><span class="stat-dot" style="background:#00E676"></span><div class="stat-info"><span class="stat-number" id="stat-active">0</span><span class="stat-label">Active</span></div></div>
+    <div class="stat-card"><span class="stat-dot" style="background:#00bcd4"></span><div class="stat-info"><span class="stat-number" id="stat-idle">6</span><span class="stat-label">Idle</span></div></div>
+    <div class="stat-card"><span class="stat-dot" style="background:#ffab40"></span><div class="stat-info"><span class="stat-number" id="stat-busy">0</span><span class="stat-label">Busy</span></div></div>
+    <div class="stat-card"><span class="stat-dot" style="background:#ff5252"></span><div class="stat-info"><span class="stat-number" id="stat-error">0</span><span class="stat-label">Error</span></div></div>
   </div>
-
-  <!-- Agent Cards -->
   <div class="agent-cards-row" id="agentCardsRow"></div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════ -->
 <!-- PAGE: Org Chart -->
-<!-- ═══════════════════════════════════════════════════════════ -->
 <div class="page" id="page-orgchart">
   <div class="page-header">
-    <div>
-      <h2>🏢 Organization Chart</h2>
-      <p class="page-subtitle">Team hierarchy and reporting structure</p>
-    </div>
+    <div><h2>🏢 Organization Chart</h2><p class="page-subtitle">Team hierarchy and reporting structure</p></div>
     <div class="page-actions">
       <button class="btn" onclick="expandAllOrg()">Expand All</button>
       <button class="btn" onclick="collapseAllOrg()">Collapse All</button>
     </div>
   </div>
-
+  <!-- Stats Summary Bar -->
+  <div class="org-stats-bar" id="orgStatsBar"></div>
   <div class="org-tree" id="orgTree"></div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════ -->
 <!-- PAGE: Scheduled Tasks -->
-<!-- ═══════════════════════════════════════════════════════════ -->
 <div class="page" id="page-scheduled">
-  <div class="page-header">
-    <div>
-      <h2>⏰ Scheduled Tasks</h2>
-      <p class="page-subtitle">Cron jobs, weekly tasks, and overnight log</p>
-    </div>
-  </div>
-
+  <div class="page-header"><div><h2>⏰ Scheduled Tasks</h2><p class="page-subtitle">Cron jobs, weekly tasks, and overnight log</p></div></div>
   <div class="scheduled-sections">
-    <div class="section-block">
-      <h3 class="section-title">📅 Daily Jobs</h3>
-      <div id="dailyJobs"></div>
-    </div>
-    <div class="section-block">
-      <h3 class="section-title">📆 Weekly Jobs</h3>
-      <div id="weeklyJobs"></div>
-    </div>
-    <div class="section-block">
-      <h3 class="section-title">🌙 Overnight Log</h3>
-      <div id="overnightLog"></div>
-    </div>
+    <div class="section-block"><h3 class="section-title">📅 Daily Jobs</h3><div id="dailyJobs"></div></div>
+    <div class="section-block"><h3 class="section-title">📆 Weekly Jobs</h3><div id="weeklyJobs"></div></div>
+    <div class="section-block"><h3 class="section-title">🌙 Overnight Log</h3><div id="overnightLog"></div></div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════ -->
 <!-- PAGE: Workspaces -->
-<!-- ═══════════════════════════════════════════════════════════ -->
 <div class="page" id="page-workspaces">
-  <div class="page-header">
-    <div>
-      <h2>📁 Agent Workspaces</h2>
-      <p class="page-subtitle">View agent configuration files</p>
-    </div>
-  </div>
-
+  <div class="page-header"><div><h2>📁 Agent Workspaces</h2><p class="page-subtitle">View and edit agent configuration files</p></div></div>
   <div class="workspace-layout">
     <aside class="ws-sidebar" id="wsSidebar">
       <div class="ws-section-title">WORKSPACES</div>
       <div id="wsAgentList"></div>
     </aside>
     <main class="ws-content" id="wsContent">
-      <div class="ws-placeholder">
-        <span>📄</span>
-        <p>Select an agent and file to view</p>
-      </div>
+      <div class="ws-placeholder"><span>📄</span><p>Select an agent and file to view</p></div>
     </main>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════ -->
 <!-- PAGE: Standups -->
-<!-- ═══════════════════════════════════════════════════════════ -->
 <div class="page" id="page-standups">
   <div class="page-header">
-    <div>
-      <h2>💬 Standups & Action Items</h2>
-      <p class="page-subtitle">Team discussions and tracked action items</p>
-    </div>
+    <div><h2>💬 Standups & Discussions</h2><p class="page-subtitle">Team discussions and tracked action items</p></div>
     <button class="btn btn-primary" onclick="openStandupModal()">+ New Standup</button>
   </div>
-
   <div id="standupsList"></div>
   <div id="standupDetail" style="display:none"></div>
+</div>
+
+<!-- PAGE: Action Items -->
+<div class="page" id="page-actions">
+  <div class="page-header">
+    <div><h2>☑️ Action Items</h2><p class="page-subtitle">Track action items across all standups</p></div>
+    <button class="btn btn-primary" onclick="openActionModal()">+ New Action</button>
+  </div>
+  <div id="actionsPending"></div>
+  <div id="actionsCompleted"></div>
+</div>
+
+<!-- PAGE: Docs -->
+<div class="page" id="page-docs">
+  <div class="page-header">
+    <div><h2>📚 Documentation</h2><p class="page-subtitle">Browse system documentation</p></div>
+    <div class="page-actions">
+      <input type="text" id="docsSearch" placeholder="Search docs..." class="docs-search-input" oninput="searchDocs()">
+    </div>
+  </div>
+  <div class="workspace-layout">
+    <aside class="ws-sidebar" id="docsSidebar">
+      <div class="ws-section-title">DOCUMENTS</div>
+      <div id="docsFileList"></div>
+    </aside>
+    <main class="ws-content" id="docsContent">
+      <div class="ws-placeholder"><span>📚</span><p>Select a document to view</p></div>
+    </main>
+  </div>
+</div>
+
+<!-- PAGE: Voice (placeholder) -->
+<div class="page" id="page-voice">
+  <div class="page-header"><div><h2>🎤 Voice Assistant</h2><p class="page-subtitle">Voice interaction with agents (coming soon)</p></div></div>
+  <div class="voice-placeholder">
+    <div class="voice-icon-large">🎤</div>
+    <h3>Voice Interface</h3>
+    <p>Real-time voice interaction with your agent team is coming soon.</p>
+    <div class="voice-features">
+      <div class="voice-feature"><span>🗣️</span><div><strong>Speech-to-Text</strong><p>Talk to agents naturally</p></div></div>
+      <div class="voice-feature"><span>🔊</span><div><strong>Text-to-Speech</strong><p>Hear agent responses</p></div></div>
+      <div class="voice-feature"><span>🎧</span><div><strong>Live Audio</strong><p>Real-time voice channels</p></div></div>
+      <div class="voice-feature"><span>📞</span><div><strong>Conference</strong><p>Multi-agent voice standups</p></div></div>
+    </div>
+    <button class="btn" disabled style="margin-top:24px;opacity:.5">Coming Soon</button>
+  </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
@@ -237,10 +214,7 @@
 <!-- Task Detail Modal -->
 <div class="modal-overlay" id="detailModal" onclick="closeDetailIfOutside(event)">
   <div class="modal" onclick="event.stopPropagation()">
-    <div class="modal-header">
-      <h2 id="detailTitle"></h2>
-      <button class="modal-close" onclick="closeDetail()">✕</button>
-    </div>
+    <div class="modal-header"><h2 id="detailTitle"></h2><button class="modal-close" onclick="closeDetail()">✕</button></div>
     <div class="modal-body" id="detailBody"></div>
   </div>
 </div>
@@ -248,36 +222,15 @@
 <!-- Create Task Modal -->
 <div class="modal-overlay" id="createModal" onclick="closeCreateIfOutside(event)">
   <div class="modal modal-sm" onclick="event.stopPropagation()">
-    <div class="modal-header">
-      <h2>New Task</h2>
-      <button class="modal-close" onclick="closeCreate()">✕</button>
-    </div>
+    <div class="modal-header"><h2>New Task</h2><button class="modal-close" onclick="closeCreate()">✕</button></div>
     <form class="modal-body" onsubmit="createTask(event)">
-      <label>Title *</label>
-      <input type="text" id="newTitle" required placeholder="Task title...">
-      <label>Description</label>
-      <textarea id="newDesc" rows="3" placeholder="Details..."></textarea>
+      <label>Title *</label><input type="text" id="newTitle" required placeholder="Task title...">
+      <label>Description</label><textarea id="newDesc" rows="3" placeholder="Details..."></textarea>
       <label>Assign to Agent</label>
-      <select id="newAgent">
-        <option value="">Unassigned</option>
-        <option value="main">Mike</option>
-        <option value="trading">Trading / AA</option>
-        <option value="it-support">IT Support</option>
-        <option value="dev">Dev</option>
-        <option value="voice">Voice</option>
-        <option value="troubleshoot">Troubleshoot</option>
-      </select>
+      <select id="newAgent"><option value="">Unassigned</option><option value="main">Mike</option><option value="trading">Trading / AA</option><option value="it-support">IT Support</option><option value="dev">Dev</option><option value="voice">Voice</option><option value="troubleshoot">Troubleshoot</option></select>
       <label>Priority</label>
-      <select id="newPriority">
-        <option value="low">Low</option>
-        <option value="medium" selected>Medium</option>
-        <option value="high">High</option>
-        <option value="critical">Critical</option>
-      </select>
-      <div class="form-actions">
-        <button type="button" class="btn" onclick="closeCreate()">Cancel</button>
-        <button type="submit" class="btn btn-primary">Create Task</button>
-      </div>
+      <select id="newPriority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="critical">Critical</option></select>
+      <div class="form-actions"><button type="button" class="btn" onclick="closeCreate()">Cancel</button><button type="submit" class="btn btn-primary">Create Task</button></div>
     </form>
   </div>
 </div>
@@ -285,13 +238,9 @@
 <!-- Create Standup Modal -->
 <div class="modal-overlay" id="standupModal" onclick="if(event.target===this)this.classList.remove('open')">
   <div class="modal modal-sm" onclick="event.stopPropagation()">
-    <div class="modal-header">
-      <h2>New Standup</h2>
-      <button class="modal-close" onclick="document.getElementById('standupModal').classList.remove('open')">✕</button>
-    </div>
+    <div class="modal-header"><h2>New Standup</h2><button class="modal-close" onclick="document.getElementById('standupModal').classList.remove('open')">✕</button></div>
     <form class="modal-body" onsubmit="createStandup(event)">
-      <label>Title *</label>
-      <input type="text" id="standupTitle" required placeholder="Standup topic...">
+      <label>Title *</label><input type="text" id="standupTitle" required placeholder="Standup topic...">
       <label>Participants</label>
       <div class="checkbox-group">
         <label class="cb-label"><input type="checkbox" value="main" checked> 🎯 Mike</label>
@@ -301,10 +250,20 @@
         <label class="cb-label"><input type="checkbox" value="voice"> 🎙️ Voice</label>
         <label class="cb-label"><input type="checkbox" value="troubleshoot"> 🔍 Troubleshoot</label>
       </div>
-      <div class="form-actions">
-        <button type="button" class="btn" onclick="document.getElementById('standupModal').classList.remove('open')">Cancel</button>
-        <button type="submit" class="btn btn-primary">Create Standup</button>
-      </div>
+      <div class="form-actions"><button type="button" class="btn" onclick="document.getElementById('standupModal').classList.remove('open')">Cancel</button><button type="submit" class="btn btn-primary">Create Standup</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Create Action Item Modal -->
+<div class="modal-overlay" id="actionModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal modal-sm" onclick="event.stopPropagation()">
+    <div class="modal-header"><h2>New Action Item</h2><button class="modal-close" onclick="document.getElementById('actionModal').classList.remove('open')">✕</button></div>
+    <form class="modal-body" onsubmit="createActionItem(event)">
+      <label>Action Item *</label><input type="text" id="actionText" required placeholder="What needs to be done...">
+      <label>Assign to</label>
+      <select id="actionAssignee"><option value="">Unassigned</option><option value="main">Mike</option><option value="trading">Trading / AA</option><option value="it-support">IT Support</option><option value="dev">Dev</option><option value="voice">Voice</option><option value="troubleshoot">Troubleshoot</option></select>
+      <div class="form-actions"><button type="button" class="btn" onclick="document.getElementById('actionModal').classList.remove('open')">Cancel</button><button type="submit" class="btn btn-primary">Create</button></div>
     </form>
   </div>
 </div>
