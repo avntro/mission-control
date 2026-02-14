@@ -298,6 +298,7 @@ def cleanup_stale_tasks():
 async def lifespan(app: FastAPI):
     init_db()
     cleanup_stale_tasks()
+    sync_reports_inbox()
     yield
 
 app = FastAPI(title="Mission Control", lifespan=lifespan)
@@ -1736,8 +1737,112 @@ def get_live_tasks(agents: str = "dev"):
 
 REPORTS_DIR = os.environ.get("REPORTS_DIR", os.path.join(os.path.dirname(__file__), "..", "reports"))
 REPORTS_IMAGES_DIR = os.path.join(REPORTS_DIR, "images")
+REPORTS_INBOX = os.environ.get("REPORTS_INBOX", "/home/pc1/.openclaw/workspace/reports")
+
+
+def _parse_frontmatter(content: str):
+    """Parse optional YAML frontmatter from markdown content. Returns (metadata_dict, body)."""
+    if not content.startswith("---"):
+        return {}, content
+    end = content.find("---", 3)
+    if end == -1:
+        return {}, content
+    front = content[3:end].strip()
+    body = content[end + 3:].lstrip("\n")
+    meta = {}
+    for line in front.split("\n"):
+        if ":" in line:
+            key, val = line.split(":", 1)
+            key = key.strip()
+            val = val.strip()
+            if val.startswith("[") and val.endswith("]"):
+                # Parse YAML-style list
+                val = [v.strip().strip("'\"") for v in val[1:-1].split(",") if v.strip()]
+            elif val.startswith('"') and val.endswith('"'):
+                val = val[1:-1]
+            meta[key] = val
+    return meta, body
+
+
+def _author_from_filename(filename: str) -> str:
+    """Extract author from filename like 'media-agent--claude-plugins.md' → 'Media Agent'."""
+    name = os.path.splitext(filename)[0]
+    if "--" in name:
+        author_part = name.split("--")[0]
+        return author_part.replace("-", " ").title()
+    return ""
+
+
+def _tags_from_filename(filename: str) -> list:
+    """Auto-generate tags from filename parts."""
+    name = os.path.splitext(filename)[0]
+    if "--" in name:
+        name = name.split("--", 1)[1]
+    parts = [p for p in name.split("-") if len(p) > 2 and not p.isdigit()]
+    return parts[:5]
+
+
+def _title_from_content(body: str) -> str:
+    """Extract title from first # heading."""
+    for line in body.split("\n"):
+        line = line.strip()
+        if line.startswith("# "):
+            return line[2:].strip()
+    return ""
+
+
+def sync_reports_inbox():
+    """Scan REPORTS_INBOX for .md files, sync new/updated ones into DB."""
+    if not os.path.isdir(REPORTS_INBOX):
+        return
+    conn = get_db()
+    # Get existing inbox reports by source path
+    existing = {}
+    rows = conn.execute("SELECT id, content_path, updated_at FROM reports WHERE source_type = 'inbox'").fetchall()
+    for r in rows:
+        existing[r["content_path"]] = {"id": r["id"], "updated_at": r["updated_at"]}
+
+    for md_file in glob.glob(os.path.join(REPORTS_INBOX, "*.md")):
+        try:
+            mtime = datetime.fromtimestamp(os.path.getmtime(md_file), tz=timezone.utc).isoformat()
+            with open(md_file, "r", encoding="utf-8", errors="replace") as f:
+                raw = f.read()
+
+            meta, body = _parse_frontmatter(raw)
+            filename = os.path.basename(md_file)
+
+            title = meta.get("title") or _title_from_content(body) or filename
+            author = meta.get("author") or _author_from_filename(filename)
+            tags = meta.get("tags") if isinstance(meta.get("tags"), list) else _tags_from_filename(filename)
+            date = meta.get("date") or mtime[:10]
+            ts = now_iso()
+
+            if md_file in existing:
+                # Check if file was modified since last sync
+                rec = existing[md_file]
+                if mtime > rec["updated_at"]:
+                    conn.execute(
+                        "UPDATE reports SET title=?, author=?, tags=?, date=?, updated_at=? WHERE id=?",
+                        (title, author, json.dumps(tags), date, ts, rec["id"])
+                    )
+            else:
+                rid = str(uuid.uuid4())[:8]
+                conn.execute(
+                    "INSERT INTO reports (id, title, date, author, source_url, source_type, tags, content_path, screenshots, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                    (rid, title, date, author, "", "inbox", json.dumps(tags), md_file, "[]", ts, ts)
+                )
+        except Exception as e:
+            print(f"[inbox] Error processing {md_file}: {e}")
+    conn.commit()
+    conn.close()
 
 # ── Reports CRUD ────────────────────────────────────────────────
+@app.post("/api/reports/sync")
+def trigger_sync():
+    """Manually trigger inbox sync."""
+    sync_reports_inbox()
+    return {"ok": True}
+
 @app.get("/api/reports")
 def list_reports(
     tag: Optional[str] = None,
@@ -1845,7 +1950,10 @@ def get_report(report_id: str):
     content_path = d.get("content_path", "")
     if content_path and os.path.exists(content_path):
         with open(content_path, "r", encoding="utf-8", errors="replace") as f:
-            d["content"] = f.read()
+            raw = f.read()
+        # Strip frontmatter for display
+        _, body = _parse_frontmatter(raw)
+        d["content"] = body
     else:
         d["content"] = ""
     conn.close()
@@ -1933,7 +2041,8 @@ def export_report(report_id: str, format: str = "md"):
     content = ""
     if content_path and os.path.exists(content_path):
         with open(content_path, "r", encoding="utf-8") as f:
-            content = f.read()
+            raw = f.read()
+        _, content = _parse_frontmatter(raw)
     conn.close()
     # Sanitize title for Content-Disposition header (latin-1 safe)
     safe_title = d["title"].encode("ascii", "ignore").decode("ascii").strip() or "report"

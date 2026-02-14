@@ -12,6 +12,7 @@ services:
       - /tmp/gpu_stats.json:/data/gpu_stats.json:ro
       - /tmp/system_stats.json:/data/system_stats.json:ro
       - /home/pc1/pc1-docs:/home/pc1/pc1-docs:ro
+      - /home/pc1/mission-control/reports:/app/reports
     environment:
       - MC_DB=/data/mission_control.db
       - GATEWAY_URL=https://100.101.174.1:18789

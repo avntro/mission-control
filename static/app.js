@@ -283,7 +283,7 @@ function liveTaskCardHTML(t) {
       ${t.status === 'in_progress' && t.created_at ? `<span class="task-duration" data-created-at="${t.created_at}" data-tick-duration>⏱ ${dur}</span>` : (dur ? `<span class="task-duration">⏱ ${dur}</span>` : '')}
       <span class="task-time" data-time-ago="${timeRef}" data-time-prefix="${timeLabel}">${timeLabel}${timeAgo(timeRef)}</span>
     </div>
-    <div class="task-model-cost">${modelStr} · ${costStr}</div>
+    ${modelStr !== '—' || costStr !== '—' ? `<div class="task-model-cost">${modelStr} · ${costStr}</div>` : ''}
     ${t.status === 'review' ? `<div class="task-review-actions" onclick="event.stopPropagation()"><button class="btn-approve" onclick="approveTask('${t.id}')">✅ Approve</button><button class="btn-reject" onclick="rejectTask('${t.id}')">↩️ Reject</button></div>` : ''}
   </div>`;
 }
@@ -310,7 +310,7 @@ function taskCardHTML(t) {
       <span class="task-time" data-time-ago="${tTimeRef}" data-time-prefix="${tTimeLabel}">${tTimeLabel}${timeAgo(tTimeRef)}</span>
       ${t.status === 'in_progress' && t.created_at ? `<span class="task-duration" data-created-at="${t.created_at}" data-tick-duration>⏱ ${dur}</span>` : (dur ? `<span class="task-duration">⏱ ${dur}</span>` : '')}
     </div>
-    <div class="task-model-cost">${tModelStr} · ${tCostStr}</div>
+    ${tModelStr !== '—' || tCostStr !== '—' ? `<div class="task-model-cost">${tModelStr} · ${tCostStr}</div>` : ''}
     ${t.status === 'review' ? `<div class="task-review-actions" onclick="event.stopPropagation()"><button class="btn-approve" onclick="approveTask('${t.id}')">✅ Approve</button><button class="btn-reject" onclick="rejectTask('${t.id}')">↩️ Reject</button></div>` : ''}
   </div>`;
 }
@@ -369,7 +369,7 @@ function renderAgents() {
   if (cardNames.join(',') !== desiredNames.join(',')) {
     // Full re-render
     el.innerHTML = items.map(d => `<div class="agent-card" data-agent="${d.name}">
-      <div class="agent-top"><span class="agent-emoji">${d.emoji}</span><span class="agent-name">${esc(d.displayName)}</span><span class="agent-status status-${d.statusClass}">${d.statusLabel}</span></div>
+      <div class="agent-top"><span class="agent-emoji">${d.emoji}</span><span class="agent-name" title="${esc(d.displayName)}">${esc(d.displayName)}</span><span class="agent-status status-${d.statusClass}">${d.statusLabel}</span></div>
       <div class="agent-token-row"><span class="agent-token-label">Context</span><span class="agent-token-value">${d.tokenStr}</span></div>
       <div class="agent-ctx-bar"><div class="agent-ctx-fill" style="width:${Math.min(d.ctxPct,100)}%;background:${d.ctxBarColor}"></div></div>
       <div class="agent-meta-model">🧠 ${esc(d.modelStr)}</div>
