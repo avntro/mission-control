@@ -291,7 +291,7 @@ function renderAgents() {
       <div class="agent-ctx-bar"><div class="agent-ctx-fill" style="width:${Math.min(d.ctxPct,100)}%;background:${d.ctxBarColor}"></div></div>
       <div class="agent-meta-model">🧠 ${esc(d.modelStr)}</div>
       ${d.liveCreatedAt ? `<div class="agent-meta"><span data-created-at="${d.liveCreatedAt}" data-tick-duration>⏱ ${d.liveDur}</span><span>📊 ${d.sessCount} sessions</span></div>` : ''}
-      ${d.subagentCount > 0 ? `<div class="agent-meta agent-subagent-row"><span>🔀 ${d.activeSubagents > 0 ? d.activeSubagents + ' active / ' : ''}${d.subagentCount} sub-agents</span></div>` : ''}
+      ${d.subagentCount > 0 ? `<div class="agent-meta agent-subagent-row" onclick="openSubagentPanel('${d.name}',event)"><span>🔀 ${d.activeSubagents > 0 ? d.activeSubagents + ' active / ' : ''}${d.subagentCount} sub-agents</span></div>` : ''}
       <div class="agent-meta"><span>💰 ${d.costStr}</span><span ${d.lastActivity ? `data-time-ago="${d.lastActivity}" data-time-prefix="🕐 "` : ''}>🕐 ${d.lastAct}</span></div>
     </div>`).join('');
     return;
@@ -432,22 +432,22 @@ async function openDetail(id) {
 
     // 8. Comments & Logs
     if (t.comments && t.comments.length) {
-      html += `<div class="detail-section"><h3>Comments &amp; Logs (${t.comments.length})</h3>`;
+      html += `<div class="detail-section"><h3>Comments &amp; Logs (${t.comments.length})</h3><div class="comments-scroll">`;
       t.comments.forEach(c => {
         const cA = agents.find(a => a.name === c.agent);
         const cN = cA ? cA.display_name : (c.agent || 'System');
         html += `<div class="comment-item type-${c.type}"><div class="comment-header"><span><span class="comment-agent">${esc(cN)}</span><span class="comment-type">${c.type}</span></span><span data-time-ago="${c.created_at}">${timeAgo(c.created_at)}</span></div><div class="comment-content">${esc(c.content)}</div></div>`;
       });
-      html += '</div>';
+      html += '</div></div>';
     }
 
     // 9. History
     if (t.history && t.history.length) {
-      html += `<div class="detail-section"><h3>History</h3><div class="history-list">`;
+      html += `<div class="detail-section"><h3>History</h3><div class="history-scroll"><div class="history-list">`;
       t.history.forEach(h => {
         html += `<div class="history-item"><span class="history-time" data-time-ago="${h.created_at}">${timeAgo(h.created_at)}</span><span class="history-action">${h.action.replace(/_/g,' ')}</span><span class="history-detail">— ${esc(h.details || '')}</span></div>`;
       });
-      html += '</div></div>';
+      html += '</div></div></div>';
     }
 
     // 10. Add Comment
@@ -596,7 +596,7 @@ async function loadTaskManager() {
     <div class="agent-ctx-row"><span>Context: ${tokenStr}</span><span style="color:${ctxColor}">${ctxPct}%</span></div>
     <div class="agent-ctx-bar-lg"><div class="agent-ctx-fill" style="width:${Math.min(ctxPct,100)}%;background:${ctxColor}"></div></div>
     <div class="agent-card-lg-stats"><div class="agent-stat"><span class="num">${sessCount}</span><span class="lbl">Sessions</span></div><div class="agent-stat"><span class="num">${activeSess}</span><span class="lbl">Active</span></div><div class="agent-stat"><span class="num">${costStr}</span><span class="lbl">Cost</span></div></div>
-    ${stats && stats.subagent_count > 0 ? `<div class="agent-subagent-badge">🔀 ${stats.active_subagents > 0 ? stats.active_subagents + ' active / ' : ''}${stats.subagent_count} sub-agents</div>` : ''}</div>`;
+    ${stats && stats.subagent_count > 0 ? `<div class="agent-subagent-badge" onclick="event.stopPropagation();openSubagentPanel('${a.name}',event)">🔀 ${stats.active_subagents > 0 ? stats.active_subagents + ' active / ' : ''}${stats.subagent_count} sub-agents</div>` : ''}</div>`;
   }).join('');
 }
 
@@ -638,9 +638,9 @@ function renderOrgChart() {
   tree.innerHTML = `
     <div class="org-level"><div class="org-node" onclick="toggleOrgChildren('mike-children')"><div class="org-node-avatar">👤</div><div class="org-node-name">Argyris</div><div class="org-node-role">Owner · CEO · Vision & Strategy</div><div class="org-node-status">${statusDot('idle')} <span style="color:var(--green)">Online</span></div></div></div>
     <div style="display:flex;justify-content:center"><div style="width:2px;height:30px;background:var(--border-hover)"></div></div>
-    <div class="org-level"><div class="org-node" onclick="toggleOrgChildren('agent-children')"><div class="org-node-avatar">🎯</div><div class="org-node-name">Mike</div><div class="org-node-role">COO · Facilitator · Task Delegation</div><div class="org-node-model">anthropic/claude-opus-4-6</div>${(() => { const ms = agentStats.find(s => s.name === 'main'); return ms && ms.subagent_count > 0 ? `<div class="org-node-subagents">🔀 ${ms.active_subagents > 0 ? ms.active_subagents + ' active / ' : ''}${ms.subagent_count} sub-agents</div>` : ''; })()}<div class="org-node-status">${statusDot(getStatus('main'))} <span>${getStatus('main')}</span></div></div></div>
+    <div class="org-level"><div class="org-node" onclick="toggleOrgChildren('agent-children')"><div class="org-node-avatar">🎯</div><div class="org-node-name">Mike</div><div class="org-node-role">COO · Facilitator · Task Delegation</div><div class="org-node-model">anthropic/claude-opus-4-6</div>${(() => { const ms = agentStats.find(s => s.name === 'main'); return ms && ms.subagent_count > 0 ? `<div class="org-node-subagents" onclick="event.stopPropagation();openSubagentPanel('main',event)">🔀 ${ms.active_subagents > 0 ? ms.active_subagents + ' active / ' : ''}${ms.subagent_count} sub-agents</div>` : ''; })()}<div class="org-node-status">${statusDot(getStatus('main'))} <span>${getStatus('main')}</span></div></div></div>
     <div style="display:flex;justify-content:center"><div style="width:2px;height:30px;background:var(--border-hover)"></div></div>
-    <div class="org-children ${collapsed}" id="agent-children">${childAgents.map(a => `<div class="org-connector"><div class="org-node"><div class="org-node-avatar">${a.emoji}</div><div class="org-node-name">${a.name}</div><div class="org-node-role">${a.role}</div><div class="org-node-model">${a.model}</div>${a.subagentCount > 0 ? `<div class="org-node-subagents">🔀 ${a.activeSubagents > 0 ? a.activeSubagents + ' active / ' : ''}${a.subagentCount} sub-agents</div>` : ''}<div class="org-node-status">${statusDot(getStatus(a.id))} <span>${getStatus(a.id)}</span></div></div></div>`).join('')}</div>`;
+    <div class="org-children ${collapsed}" id="agent-children">${childAgents.map(a => `<div class="org-connector"><div class="org-node"><div class="org-node-avatar">${a.emoji}</div><div class="org-node-name">${a.name}</div><div class="org-node-role">${a.role}</div><div class="org-node-model">${a.model}</div>${a.subagentCount > 0 ? `<div class="org-node-subagents" onclick="event.stopPropagation();openSubagentPanel('${a.id}',event)">🔀 ${a.activeSubagents > 0 ? a.activeSubagents + ' active / ' : ''}${a.subagentCount} sub-agents</div>` : ''}<div class="org-node-status">${statusDot(getStatus(a.id))} <span>${getStatus(a.id)}</span></div></div></div>`).join('')}</div>`;
 }
 
 function toggleOrgChildren(id) { const el = document.getElementById(id); if (el) el.classList.toggle('collapsed'); }
@@ -1133,6 +1133,90 @@ function renderGpuWidget(g) {
 
 setInterval(loadGpuStats, 5000);
 document.addEventListener('DOMContentLoaded', () => setTimeout(loadGpuStats, 500));
+
+// ══════════════════════════════════════════════════════════════
+// SUB-AGENT DRILL-DOWN
+// ══════════════════════════════════════════════════════════════
+
+function openSubagentPanel(agentName, evt) {
+  if (evt) { evt.stopPropagation(); evt.preventDefault(); }
+  const info = AGENT_INFO[agentName] || { name: agentName, emoji: '🤖', color: '#888' };
+  const subs = liveTasks.filter(t => t.source === 'subagent' && t.assigned_agent === agentName);
+
+  // Sort: active first, then by created_at desc
+  subs.sort((a, b) => {
+    if (a.status === 'in_progress' && b.status !== 'in_progress') return -1;
+    if (b.status === 'in_progress' && a.status !== 'in_progress') return 1;
+    return (b.created_at || '').localeCompare(a.created_at || '');
+  });
+
+  const activeCount = subs.filter(s => s.status === 'in_progress').length;
+  const doneCount = subs.length - activeCount;
+
+  document.getElementById('subagentModalTitle').innerHTML =
+    `${info.emoji} ${esc(info.name)} — Sub-agents`;
+
+  let html = '';
+
+  // Summary bar
+  html += `<div class="subagent-summary">
+    <span class="subagent-summary-item"><span class="subagent-dot dot-active"></span>${activeCount} running</span>
+    <span class="subagent-summary-item"><span class="subagent-dot dot-done"></span>${doneCount} completed</span>
+    <span class="subagent-summary-item">📊 ${subs.length} total</span>
+  </div>`;
+
+  if (!subs.length) {
+    html += '<p style="text-align:center;color:var(--muted);padding:32px 0">No sub-agents found for this agent.</p>';
+  } else {
+    html += '<div class="subagent-list subagent-scroll">';
+    for (const s of subs) {
+      const isActive = s.status === 'in_progress';
+      const statusIcon = isActive ? '🔄' : s.status === 'review' ? '👀' : '✅';
+      const statusLabel = isActive ? 'Running' : s.status === 'review' ? 'Review' : 'Done';
+      const statusClass = isActive ? 'running' : s.status === 'review' ? 'review' : 'done';
+
+      // Duration
+      let durHtml = '';
+      if (isActive && s.created_at) {
+        const elapsed = (Date.now() - new Date(s.created_at).getTime()) / 1000;
+        durHtml = `<span class="subagent-dur" data-created-at="${s.created_at}" data-tick-duration>⏱ ${formatDuration(elapsed)}</span>`;
+      } else if (s.duration) {
+        durHtml = `<span class="subagent-dur">⏱ ${formatDuration(s.duration)}</span>`;
+      }
+
+      const modelStr = s.model ? s.model.replace('anthropic/', '').replace('claude-', 'c-') : '—';
+      const costStr = s.cost != null && s.cost > 0 ? `$${s.cost.toFixed(2)}` : '—';
+      const tokStr = s.tokens ? formatTokens(s.tokens) : '—';
+      const timeStr = s.created_at ? timeAgo(s.created_at) : '';
+
+      html += `<div class="subagent-row subagent-${statusClass}" onclick="document.getElementById('subagentModal').classList.remove('open');openLiveDetail('${s.id}')">
+        <div class="subagent-row-top">
+          <span class="subagent-status-badge status-${statusClass}">${statusIcon} ${statusLabel}</span>
+          ${durHtml}
+          <span class="subagent-time" ${s.created_at ? `data-time-ago="${s.created_at}"` : ''}>${timeStr}</span>
+        </div>
+        <div class="subagent-row-title">${esc(s.title)}</div>
+        <div class="subagent-row-stats">
+          <span>🔤 ${tokStr}</span>
+          <span>💰 ${costStr}</span>
+          <span>🧠 ${esc(modelStr)}</span>
+        </div>
+      </div>`;
+    }
+    html += '</div>';
+
+    // Totals footer
+    const totalTokens = subs.reduce((sum, s) => sum + (s.tokens || 0), 0);
+    const totalCost = subs.reduce((sum, s) => sum + (s.cost || 0), 0);
+    html += `<div class="subagent-footer">
+      <span>Total: 🔤 ${formatTokens(totalTokens)}</span>
+      <span>💰 $${totalCost.toFixed(2)}</span>
+    </div>`;
+  }
+
+  document.getElementById('subagentModalBody').innerHTML = html;
+  document.getElementById('subagentModal').classList.add('open');
+}
 
 // ── Helpers ────────────────────────────────────────────────────
 function esc(s) { if (!s) return ''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }

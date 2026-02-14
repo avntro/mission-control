@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mission Control — OpenClaw</title>
 <meta name="theme-color" content="#1a1a1a">
-<link rel="stylesheet" href="/static/style.css?v=20260214o">
+<link rel="stylesheet" href="/static/style.css?v=20260214p">
 </head>
 <body>
 
@@ -258,6 +258,14 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=20260214m"></script>
+<!-- Sub-agent Drill-down Modal -->
+<div class="modal-overlay" id="subagentModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal modal-md" onclick="event.stopPropagation()">
+    <div class="modal-header"><h2 id="subagentModalTitle">Sub-agents</h2><button class="modal-close" onclick="document.getElementById('subagentModal').classList.remove('open')">✕</button></div>
+    <div class="modal-body" id="subagentModalBody"></div>
+  </div>
+</div>
+
+<script src="/static/app.js?v=20260214n"></script>
 </body>
 </html>

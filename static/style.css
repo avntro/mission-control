@@ -478,7 +478,49 @@ body{
 .lightbox-close:hover{background:var(--red);color:#fff}
 
 /* Sub-agent badges */
-.agent-subagent-row{color:#e040fb !important}
+.agent-subagent-row{color:#e040fb !important;cursor:pointer;transition:background .15s}
+.agent-subagent-row:hover{background:rgba(224,64,251,.1);border-radius:4px}
 .agent-subagent-row span{color:#e040fb;font-size:.75rem}
-.agent-subagent-badge{margin-top:8px;padding:4px 10px;background:rgba(224,64,251,.1);border:1px solid rgba(224,64,251,.25);border-radius:6px;color:#e040fb;font-size:.75rem;text-align:center}
-.org-node-subagents{font-size:.72rem;color:#e040fb;margin-top:2px}
+.agent-subagent-badge{margin-top:8px;padding:4px 10px;background:rgba(224,64,251,.1);border:1px solid rgba(224,64,251,.25);border-radius:6px;color:#e040fb;font-size:.75rem;text-align:center;cursor:pointer;transition:background .15s,border-color .15s}
+.agent-subagent-badge:hover{background:rgba(224,64,251,.2);border-color:rgba(224,64,251,.5)}
+.org-node-subagents{font-size:.72rem;color:#e040fb;margin-top:2px;cursor:pointer;transition:opacity .15s}
+.org-node-subagents:hover{opacity:.7}
+
+/* Sub-agent modal */
+.modal-md{width:600px;max-width:95vw;max-height:85vh}
+.subagent-summary{display:flex;gap:16px;padding:10px 0 14px;border-bottom:1px solid var(--border);margin-bottom:12px;flex-wrap:wrap}
+.subagent-summary-item{display:flex;align-items:center;gap:5px;font-size:.8rem;color:var(--muted)}
+.subagent-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.subagent-dot.dot-active{background:#ffab40;box-shadow:0 0 6px #ffab40}
+.subagent-dot.dot-done{background:#00E676;box-shadow:0 0 6px #00E676}
+.subagent-list{display:flex;flex-direction:column;gap:8px;max-height:55vh;overflow-y:auto;padding-right:4px}
+.subagent-row{padding:12px 14px;background:var(--card);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:border-color .15s,background .15s,transform .1s}
+.subagent-row:hover{border-color:var(--accent);background:rgba(0,188,212,.04);transform:translateX(2px)}
+.subagent-row.subagent-running{border-left:3px solid #ffab40}
+.subagent-row.subagent-review{border-left:3px solid #e040fb}
+.subagent-row.subagent-done{border-left:3px solid #00E676}
+.subagent-row-top{display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+.subagent-status-badge{font-size:.7rem;padding:2px 8px;border-radius:10px;font-weight:600}
+.subagent-status-badge.status-running{background:rgba(255,171,64,.15);color:#ffab40}
+.subagent-status-badge.status-review{background:rgba(224,64,251,.15);color:#e040fb}
+.subagent-status-badge.status-done{background:rgba(0,230,118,.12);color:#00E676}
+.subagent-dur{font-size:.75rem;color:var(--accent);font-variant-numeric:tabular-nums}
+.subagent-time{font-size:.7rem;color:var(--muted);margin-left:auto}
+.subagent-row-title{font-size:.84rem;color:var(--text);line-height:1.4;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.subagent-row-stats{display:flex;gap:14px;font-size:.72rem;color:var(--muted)}
+.subagent-footer{display:flex;gap:20px;padding:12px 0 4px;border-top:1px solid var(--border);margin-top:12px;font-size:.78rem;color:var(--muted);justify-content:center}
+
+/* ── Scrollable Lists (constrained height + elegant scrollbar) ── */
+.col-cards{max-height:calc(100vh - 320px)}
+#col-done{max-height:400px}
+.detail-section .comment-item:first-child{margin-top:0}
+.comments-scroll,.history-scroll,.subagent-scroll,.activity-scroll,.overnight-scroll{
+  max-height:400px;overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:transparent transparent;
+}
+.comments-scroll:hover,.history-scroll:hover,.subagent-scroll:hover,.activity-scroll:hover,.overnight-scroll:hover{
+  scrollbar-color:rgba(0,255,200,0.3) transparent;
+}
+.comments-scroll::-webkit-scrollbar,.history-scroll::-webkit-scrollbar,.subagent-scroll::-webkit-scrollbar,.activity-scroll::-webkit-scrollbar,.overnight-scroll::-webkit-scrollbar{width:6px}
+.comments-scroll::-webkit-scrollbar-thumb,.history-scroll::-webkit-scrollbar-thumb,.subagent-scroll::-webkit-scrollbar-thumb,.activity-scroll::-webkit-scrollbar-thumb,.overnight-scroll::-webkit-scrollbar-thumb{background:transparent;border-radius:3px}
+.comments-scroll:hover::-webkit-scrollbar-thumb,.history-scroll:hover::-webkit-scrollbar-thumb,.subagent-scroll:hover::-webkit-scrollbar-thumb,.activity-scroll:hover::-webkit-scrollbar-thumb,.overnight-scroll:hover::-webkit-scrollbar-thumb{background:rgba(0,255,200,0.3)}
