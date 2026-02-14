@@ -253,7 +253,7 @@ def cleanup_stale_tasks():
             updated = datetime.fromisoformat(row["updated_at"])
             if (now - updated).total_seconds() > 3600:
                 conn.execute(
-                    "UPDATE tasks SET status = 'done', completed_at = ?, updated_at = ? WHERE id = ?",
+                    "UPDATE tasks SET status = 'review', completed_at = ?, updated_at = ? WHERE id = ?",
                     (now.isoformat(), now.isoformat(), row["id"])
                 )
         except:
@@ -1085,6 +1085,48 @@ def read_doc(filename: str):
         content = f.read()
     return {"filename": filename, "content": content}
 
+# ── Task Approve / Reject ───────────────────────────────────────
+@app.post("/api/tasks/{task_id}/approve")
+def approve_task(task_id: str):
+    """Move a task from review to done. Only the user should call this."""
+    conn = get_db()
+    row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    ts = now_iso()
+    if row:
+        conn.execute("UPDATE tasks SET status = 'done', completed_at = ?, updated_at = ? WHERE id = ?",
+                     (ts, ts, task_id))
+        add_activity(conn, row["assigned_agent"] or "user", "task_approved", f"Approved: {row['title']}", task_id)
+    else:
+        # For live tasks, create a DB record to persist the approved status
+        conn.execute(
+            "INSERT INTO tasks (id, title, description, assigned_agent, priority, status, created_at, updated_at, completed_at) VALUES (?,?,?,?,?,?,?,?,?)",
+            (task_id, "Approved task", "", "", "medium", "done", ts, ts, ts)
+        )
+        add_activity(conn, "user", "task_approved", f"Approved: {task_id}", task_id)
+    conn.commit()
+    conn.close()
+    return {"ok": True, "status": "done"}
+
+@app.post("/api/tasks/{task_id}/reject")
+def reject_task(task_id: str):
+    """Move a task from review back to in_progress (needs rework)."""
+    conn = get_db()
+    row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    ts = now_iso()
+    if row:
+        conn.execute("UPDATE tasks SET status = 'todo', updated_at = ?, completed_at = NULL WHERE id = ?",
+                     (ts, task_id))
+        add_activity(conn, row["assigned_agent"] or "user", "task_rejected", f"Rejected: {row['title']}", task_id)
+    else:
+        conn.execute(
+            "INSERT INTO tasks (id, title, description, assigned_agent, priority, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
+            (task_id, "Rejected task", "", "", "medium", "todo", ts, ts)
+        )
+        add_activity(conn, "user", "task_rejected", f"Rejected: {task_id}", task_id)
+    conn.commit()
+    conn.close()
+    return {"ok": True, "status": "todo"}
+
 # ── Webhook (OpenClaw integration) ─────────────────────────────
 @app.post("/api/webhook/openclaw")
 def openclaw_webhook(event: WebhookEvent):
@@ -1108,7 +1150,7 @@ def openclaw_webhook(event: WebhookEvent):
         tid = event.runId[:8] if event.runId else ""
         ts = now_iso()
         if tid:
-            conn.execute("UPDATE tasks SET status = 'done', completed_at = ?, updated_at = ?, duration = ? WHERE id = ?",
+            conn.execute("UPDATE tasks SET status = 'review', completed_at = ?, updated_at = ?, duration = ? WHERE id = ?",
                          (ts, ts, event.duration, tid))
         conn.execute("UPDATE agents SET status = 'idle', last_activity = ?, current_task = NULL WHERE name = ?",
                      (ts, event.agent))
@@ -1533,13 +1575,23 @@ def get_live_tasks():
             clean_title = make_smart_title(raw_title, session_label, session_key)
 
             # Determine kanban status
-            # Check for deleted sessions (completed)
-            if is_active:
+            # Check DB for user-approved tasks (status = 'done')
+            db_status = None
+            try:
+                db_conn = get_db()
+                db_row = db_conn.execute("SELECT status FROM tasks WHERE id = ?", (f"live-{sid[:8]}",)).fetchone()
+                if db_row:
+                    db_status = db_row[0]
+                db_conn.close()
+            except:
+                pass
+
+            if db_status == "done":
+                status = "done"  # User explicitly approved
+            elif is_active:
                 status = "in_progress"
-            elif age_ms < 300_000:  # last 5 min
-                status = "review"  # recently finished, needs review
             else:
-                status = "done"
+                status = "review"  # Needs user approval to move to done
 
             # Duration: parse first and last timestamps from jsonl
             duration = None

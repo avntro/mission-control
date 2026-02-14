@@ -451,8 +451,7 @@ body{
   .layout{flex-direction:column!important;height:auto!important}
   .sidebar{width:100%!important;min-width:100%!important;border-right:none;border-bottom:1px solid var(--border);max-height:none!important;overflow-y:visible!important;position:relative;padding:10px}
   .sidebar h2{display:inline-block;font-size:.75rem;margin-bottom:8px;margin-right:12px}
-  #systemWidget,#gpuWidget{display:none}
-  .sidebar h2:nth-of-type(2),.sidebar h2:nth-of-type(3){display:none}
+  .sidebar h2:nth-of-type(2),.sidebar h2:nth-of-type(3){font-size:.7rem;margin-top:10px}
   #agentsList{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;mask-image:linear-gradient(to right,#000 90%,transparent);-webkit-mask-image:linear-gradient(to right,#000 90%,transparent)}
   #agentsList:hover{mask-image:none;-webkit-mask-image:none}
   .agent-card{min-width:200px;max-width:220px;flex-shrink:0}
@@ -616,3 +615,12 @@ body{
 .comments-scroll::-webkit-scrollbar,.history-scroll::-webkit-scrollbar,.subagent-scroll::-webkit-scrollbar,.activity-scroll::-webkit-scrollbar,.overnight-scroll::-webkit-scrollbar{width:6px}
 .comments-scroll::-webkit-scrollbar-thumb,.history-scroll::-webkit-scrollbar-thumb,.subagent-scroll::-webkit-scrollbar-thumb,.activity-scroll::-webkit-scrollbar-thumb,.overnight-scroll::-webkit-scrollbar-thumb{background:transparent;border-radius:3px}
 .comments-scroll:hover::-webkit-scrollbar-thumb,.history-scroll:hover::-webkit-scrollbar-thumb,.subagent-scroll:hover::-webkit-scrollbar-thumb,.activity-scroll:hover::-webkit-scrollbar-thumb,.overnight-scroll:hover::-webkit-scrollbar-thumb{background:rgba(0,255,200,0.3)}
+
+/* Review approve/reject buttons */
+.task-review-actions { display:flex; gap:6px; margin-top:8px; }
+.btn-approve, .btn-reject { flex:1; padding:6px 10px; border:none; border-radius:6px; cursor:pointer; font-size:.78rem; font-weight:600; transition:all .15s; }
+.btn-approve { background:#22c55e22; color:#22c55e; border:1px solid #22c55e44; }
+.btn-approve:hover { background:#22c55e; color:#fff; }
+.btn-reject { background:#f59e0b22; color:#f59e0b; border:1px solid #f59e0b44; }
+.btn-reject:hover { background:#f59e0b; color:#fff; }
+

@@ -242,6 +242,7 @@ function liveTaskCardHTML(t) {
       <span class="task-time" data-time-ago="${timeRef}" data-time-prefix="${timeLabel}">${timeLabel}${timeAgo(timeRef)}</span>
     </div>
     <div class="task-model-cost">${modelStr} · ${costStr}</div>
+    ${t.status === 'review' ? `<div class="task-review-actions" onclick="event.stopPropagation()"><button class="btn-approve" onclick="approveTask('${t.id}')">✅ Approve</button><button class="btn-reject" onclick="rejectTask('${t.id}')">↩️ Reject</button></div>` : ''}
   </div>`;
 }
 
@@ -268,6 +269,7 @@ function taskCardHTML(t) {
       ${t.status === 'in_progress' && t.created_at ? `<span class="task-duration" data-created-at="${t.created_at}" data-tick-duration>⏱ ${dur}</span>` : (dur ? `<span class="task-duration">⏱ ${dur}</span>` : '')}
     </div>
     <div class="task-model-cost">${tModelStr} · ${tCostStr}</div>
+    ${t.status === 'review' ? `<div class="task-review-actions" onclick="event.stopPropagation()"><button class="btn-approve" onclick="approveTask('${t.id}')">✅ Approve</button><button class="btn-reject" onclick="rejectTask('${t.id}')">↩️ Reject</button></div>` : ''}
   </div>`;
 }
 
@@ -645,7 +647,11 @@ async function openDetail(id) {
       html += '</div></div></div>';
     }
 
-    // 10. Add Comment
+    // 10. Approve/Reject for review tasks
+    if (t.status === 'review') {
+      html += `<div class="detail-section"><div class="task-review-actions" style="justify-content:center"><button class="btn-approve" style="padding:10px 24px;font-size:.9rem" onclick="approveTask('${t.id}')">✅ Approve &amp; Mark Done</button><button class="btn-reject" style="padding:10px 24px;font-size:.9rem" onclick="rejectTask('${t.id}')">↩️ Reject &amp; Send Back</button></div></div>`;
+    }
+    // 11. Add Comment
     html += `<div class="detail-section"><h3>Add Comment</h3><textarea id="commentText" rows="3" placeholder="Add a comment..." style="width:100%;padding:10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--card);color:var(--text);font-family:inherit;font-size:.83rem;margin-bottom:8px"></textarea><button class="btn btn-sm" style="background:var(--red);color:#fff;border-color:var(--red)" onclick="addComment('${t.id}')">Add Comment</button></div>`;
 
     document.getElementById('detailBody').innerHTML = html;
@@ -747,11 +753,18 @@ function openLiveDetail(id) {
     ${t.priority ? `<div>📊 <strong>Priority:</strong> ${t.priority}</div>` : ''}
   </div></div>`;
 
+  // Approve/Reject buttons for review tasks
+  if (t.status === 'review') {
+    html += `<div class="detail-section"><div class="task-review-actions" style="justify-content:center"><button class="btn-approve" style="padding:10px 24px;font-size:.9rem" onclick="approveTask('${t.id}')">✅ Approve &amp; Mark Done</button><button class="btn-reject" style="padding:10px 24px;font-size:.9rem" onclick="rejectTask('${t.id}')">↩️ Reject &amp; Send Back</button></div></div>`;
+  }
+
   document.getElementById('detailBody').innerHTML = html;
   document.getElementById('detailModal').classList.add('open');
 }
 async function moveTask(id, status) { await fetch(`${API}/api/tasks/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status}) }); closeDetail(); await loadTasks(); renderBoard(); }
 async function deleteTask(id) { if (!confirm('Delete this task?')) return; await fetch(`${API}/api/tasks/${id}`, { method:'DELETE' }); closeDetail(); await loadTasks(); renderBoard(); }
+async function approveTask(id) { await fetch(`${API}/api/tasks/${id}/approve`, { method:'POST' }); closeDetail(); await loadTasks(); renderBoard(); }
+async function rejectTask(id) { await fetch(`${API}/api/tasks/${id}/reject`, { method:'POST' }); closeDetail(); await loadTasks(); renderBoard(); }
 async function addComment(taskId) { const text = document.getElementById('commentText').value.trim(); if (!text) return; await fetch(`${API}/api/comments`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({task_id:taskId,content:text,agent:'',type:'comment'}) }); openDetail(taskId); }
 
 function openCreateModal() { document.getElementById('createModal').classList.add('open'); }
@@ -1218,7 +1231,7 @@ function searchDocs() {
 
 async function loadSystemStats() {
   try {
-    const res = await fetch(`${API}/api/system`);
+    const res = await fetch(`${API}/api/system?_=${Date.now()}`);
     if (!res.ok) throw new Error('System stats unavailable');
     const s = await res.json();
     renderSystemWidget(s);
@@ -1301,7 +1314,7 @@ const GPU_HISTORY_MAX = 60;
 
 async function loadGpuStats() {
   try {
-    const res = await fetch(`${API}/api/gpu`);
+    const res = await fetch(`${API}/api/gpu?_=${Date.now()}`);
     if (!res.ok) throw new Error('GPU unavailable');
     const g = await res.json();
     gpuHistory.push(g.gpu_use);

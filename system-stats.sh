@@ -111,6 +111,6 @@ while true; do
   "timestamp": $(date +%s)
 }
 EOF
-    mv "$OUTPUT.tmp" "$OUTPUT"
+    cat "$OUTPUT.tmp" > "$OUTPUT"
     sleep 5
 done
