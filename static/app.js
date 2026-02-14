@@ -146,6 +146,8 @@ function liveTaskCardHTML(t) {
   const tokens = t.tokens ? formatTokens(t.tokens) : '';
   const sourceIcon = t.source === 'cron' ? '⏰' : t.source === 'subagent' ? '🔀' : '🎮';
   const activePulse = t.status === 'in_progress' ? ' live-pulse' : '';
+  const modelStr = t.model ? t.model.replace('anthropic/', '').replace('claude-', 'c-') : '—';
+  const costStr = t.cost != null && t.cost > 0 ? `$${t.cost.toFixed(2)}` : '—';
   return `<div class="task-card live-task${activePulse}" data-id="${t.id}">
     <div class="task-live-badge">${sourceIcon} LIVE</div>
     <div class="task-title">${esc(t.title)}</div>
@@ -155,6 +157,7 @@ function liveTaskCardHTML(t) {
       ${t.status === 'in_progress' && t.created_at ? `<span class="task-duration" data-created-at="${t.created_at}" data-tick-duration>⏱ ${dur}</span>` : (dur ? `<span class="task-duration">⏱ ${dur}</span>` : '')}
       <span class="task-time" data-time-ago="${t.created_at}">${timeAgo(t.created_at)}</span>
     </div>
+    <div class="task-model-cost">${modelStr} · ${costStr}</div>
   </div>`;
 }
 
@@ -168,6 +171,8 @@ function taskCardHTML(t) {
   } else if (t.duration && t.duration > 0) {
     dur = formatDuration(t.duration);
   }
+  const tModelStr = t.model ? t.model.replace('anthropic/', '').replace('claude-', 'c-') : '—';
+  const tCostStr = t.cost != null && t.cost > 0 ? `$${t.cost.toFixed(2)}` : '—';
   return `<div class="task-card" draggable="true" data-id="${t.id}" onclick="openDetail('${t.id}')">
     <div class="task-title">${esc(t.title)}</div>
     <div class="task-meta">
@@ -176,6 +181,7 @@ function taskCardHTML(t) {
       <span class="task-time" data-time-ago="${t.created_at}">${timeAgo(t.created_at)}</span>
       ${t.status === 'in_progress' && t.created_at ? `<span class="task-duration" data-created-at="${t.created_at}" data-tick-duration>⏱ ${dur}</span>` : (dur ? `<span class="task-duration">⏱ ${dur}</span>` : '')}
     </div>
+    <div class="task-model-cost">${tModelStr} · ${tCostStr}</div>
   </div>`;
 }
 

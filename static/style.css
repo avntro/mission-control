@@ -117,6 +117,7 @@ body{
 .priority-low{background:rgba(136,136,136,.15);color:var(--muted)}
 .task-time{font-size:.62rem;color:var(--muted)}
 .task-duration{font-size:.62rem;color:var(--green)}
+.task-model-cost{font-size:.62rem;color:var(--muted);margin-top:4px;font-family:monospace;opacity:.8}
 
 /* ── Activity Feed ──────────────────────────────────────────── */
 .activity-header{margin-bottom:16px}
