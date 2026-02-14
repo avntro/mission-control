@@ -1249,14 +1249,13 @@ def _parse_session_stats(agent_dir: str) -> Dict[str, Any]:
 def get_agent_stats():
     """Return live token usage and status for all agents from session files."""
     agents_dir = os.path.join(OPENCLAW_HOME, "agents")
-    agent_names = {
-        "main": {"display": "Mike", "emoji": "🎯", "default_model": "claude-opus-4-6"},
-        "dev": {"display": "Dev", "emoji": "💻", "default_model": "claude-opus-4-6"},
-        "trading": {"display": "Trading / AA", "emoji": "📈", "default_model": "claude-opus-4-6"},
-        "it-support": {"display": "IT Support", "emoji": "🔧", "default_model": "claude-sonnet-4-20250514"},
-        "voice": {"display": "Voice", "emoji": "🎙️", "default_model": "claude-sonnet-4-20250514"},
-        "troubleshoot": {"display": "Troubleshoot", "emoji": "🔍", "default_model": "claude-opus-4-6"},
-    }
+    # Dynamic: build agent list from DB (synced from openclaw.json config)
+    conn = get_db()
+    rows = conn.execute("SELECT name, display_name, emoji, model FROM agents").fetchall()
+    conn.close()
+    agent_names = {}
+    for r in rows:
+        agent_names[r[0]] = {"display": r[1], "emoji": r[2], "default_model": r[3] or ""}
     result = []
     for name, info in agent_names.items():
         agent_dir = os.path.join(agents_dir, name)

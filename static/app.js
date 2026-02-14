@@ -13,18 +13,18 @@ let wsCurrentAgent = null;
 let wsCurrentFile = null;
 let lastWorkspaceCheck = null;
 
-// Agent display info
-const AGENT_INFO = {
-  main: { name: 'Mike', emoji: '🎯', color: '#ffc107' },
-  trading: { name: 'Trading / AA', emoji: '📈', color: '#00E676' },
-  'it-support': { name: 'IT Support', emoji: '🔧', color: '#00b0ff' },
-  dev: { name: 'Dev', emoji: '💻', color: '#00bcd4' },
-  voice: { name: 'Voice', emoji: '🎙️', color: '#e040fb' },
-  troubleshoot: { name: 'Troubleshoot', emoji: '🔍', color: '#ff5252' },
-  docs: { name: 'Docs', emoji: '📚', color: '#7c4dff' },
-  researcher: { name: 'Researcher', emoji: '🔬', color: '#64ffda' },
-  security: { name: 'Security', emoji: '🛡️', color: '#ffd740' },
-};
+// Agent display info — built dynamically from API, with color fallbacks
+const AGENT_COLOR_MAP = { main:'#ffc107', trading:'#00E676', 'it-support':'#00b0ff', dev:'#00bcd4', voice:'#e040fb', troubleshoot:'#ff5252', docs:'#7c4dff', researcher:'#64ffda', security:'#ffd740' };
+const AGENT_COLOR_POOL = ['#ff7043','#ab47bc','#26c6da','#9ccc65','#ef5350','#42a5f5','#ffca28','#8d6e63'];
+let AGENT_INFO = {};
+function rebuildAgentInfo() {
+  const info = {};
+  let ci = 0;
+  for (const a of agents) {
+    info[a.name] = { name: a.display_name || a.name, emoji: a.emoji || '🤖', color: AGENT_COLOR_MAP[a.name] || AGENT_COLOR_POOL[ci++ % AGENT_COLOR_POOL.length] };
+  }
+  AGENT_INFO = info;
+}
 
 // ── Init ───────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -219,7 +219,7 @@ async function loadAgents() {
     const res = await fetch(`${API}/api/agents`);
     const data = await res.json();
     const json = JSON.stringify(data);
-    if (json !== _lastAgentsJSON) { _lastAgentsJSON = json; agents = data; renderAgents(); }
+    if (json !== _lastAgentsJSON) { _lastAgentsJSON = json; agents = data; rebuildAgentInfo(); renderAgents(); }
   } catch(e) { console.error('Failed to load agents', e); }
 }
 
