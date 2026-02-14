@@ -592,7 +592,7 @@ async function loadTaskManager() {
     const costStr = stats ? `$${stats.total_cost.toFixed(2)}` : '$0.00';
     const sessCount = stats ? stats.session_count : 0;
     const activeSess = stats ? stats.active_sessions : 0;
-    return `<div class="agent-card-lg"><div class="agent-card-lg-top"><div class="agent-avatar">${a.emoji}</div><div class="agent-card-lg-info"><h3>${esc(a.display_name)}</h3><div class="model-tag">${esc(stats?.model || a.model)}</div></div><span class="agent-status-pill" style="${sc}">${statusLabel}</span></div>
+    return `<div class="agent-card-lg" onclick="openAgentSessions('${a.name}')"><div class="agent-card-lg-top"><div class="agent-avatar">${a.emoji}</div><div class="agent-card-lg-info"><h3>${esc(a.display_name)}</h3><div class="model-tag">${esc(stats?.model || a.model)}</div></div><span class="agent-status-pill" style="${sc}">${statusLabel}</span></div>
     <div class="agent-ctx-row"><span>Context: ${tokenStr}</span><span style="color:${ctxColor}">${ctxPct}%</span></div>
     <div class="agent-ctx-bar-lg"><div class="agent-ctx-fill" style="width:${Math.min(ctxPct,100)}%;background:${ctxColor}"></div></div>
     <div class="agent-card-lg-stats"><div class="agent-stat"><span class="num">${sessCount}</span><span class="lbl">Sessions</span></div><div class="agent-stat"><span class="num">${activeSess}</span><span class="lbl">Active</span></div><div class="agent-stat"><span class="num">${costStr}</span><span class="lbl">Cost</span></div></div>

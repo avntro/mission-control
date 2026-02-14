@@ -1295,6 +1295,16 @@ def get_agent_stats():
             "active_sessions": len([s for s in stats["sessions"] if s["active"]]),
             "subagent_count": len([s for s in stats["sessions"] if ":subagent:" in s["key"]]),
             "active_subagents": len([s for s in stats["sessions"] if ":subagent:" in s["key"] and s["active"]]),
+            "sessions": [{
+                "key": s["key"],
+                "sessionId": s["sessionId"],
+                "tokens": s["tokens"],
+                "cost": s["cost"],
+                "model": s["model"],
+                "active": s["active"],
+                "updatedAt": s["updatedAt"],
+                "task": s["task"],
+            } for s in stats["sessions"]],
         })
     return result
 
