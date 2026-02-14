@@ -5,9 +5,10 @@ from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field
 
 DB_PATH = os.environ.get("MC_DB", "/data/mission_control.db")
@@ -1377,6 +1378,16 @@ def get_live_tasks():
     tasks_list.sort(key=lambda t: (0 if t["status"] == "in_progress" else 1, -(t.get("duration") or 0)))
     return tasks_list
 
+
+# ── No-cache middleware for static assets ───────────────────────
+class NoCacheStaticMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return response
+
+app.add_middleware(NoCacheStaticMiddleware)
 
 # ── Static files ────────────────────────────────────────────────
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "static")
