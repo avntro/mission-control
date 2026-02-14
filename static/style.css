@@ -463,8 +463,9 @@ body{
   .stat-card{min-width:120px;padding:12px 14px;flex:1 1 calc(33% - 8px)}
   .stat-number{font-size:1.2rem}
   /* Org chart responsive */
-  .org-children{flex-wrap:wrap;gap:16px;padding-top:10px}
-  .org-children::before{left:10%;right:10%}
+  .org-children{flex-wrap:wrap;gap:16px;padding-top:10px;justify-content:center}
+  .org-children::before{display:none}
+  .org-connector::before{display:none}
   .org-node{min-width:140px;max-width:200px;padding:12px 14px}
   .org-tree{padding:10px 0 40px}
   .org-level{margin-bottom:20px}
@@ -475,6 +476,13 @@ body{
   .job-desc{white-space:normal;word-break:break-word;max-width:100%}
   .job-info{min-width:0;overflow:hidden}
   .job-row{flex-wrap:wrap}
+  /* Activity feed touch optimization */
+  .activity-item{padding:16px 12px}
+  /* Premium grid on tablet */
+  .premium-grid{grid-template-columns:repeat(2,1fr)}
+  /* Modal width on tablet */
+  .modal{max-width:90vw}
+  .modal.premium-detail{max-width:90vw}
 }
 @media(max-width:768px){
   .layout{flex-direction:column;height:auto}
