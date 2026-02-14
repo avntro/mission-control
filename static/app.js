@@ -12,17 +12,25 @@ let orgExpanded = true;
 function cleanTitle(title) {
   if (!title) return 'Untitled';
   let t = title;
-  // Strip timestamps like [Sat 2026-02-14 18:24 GMT+2]
+  // Strip timestamps like [Sat 2026-02-14 18:24 GMT+2] or [2026-02-14 18:24]
   t = t.replace(/\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?:\s*[A-Z]{2,5}[+-]?\d*)?\]/gi, '');
-  // Strip URLs
-  t = t.replace(/https?:\/\/[^\s)]+/g, '');
+  t = t.replace(/\[\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}[^\]]*\]/g, '');
+  // Strip cron prefixes [cron:...]
+  t = t.replace(/\[cron:[^\]]+\]\s*/gi, '');
+  // Strip URLs (including parenthesized)
+  t = t.replace(/\(?https?:\/\/[^\s)]+\)?\s*/g, '');
   // Strip markdown bold/italic
   t = t.replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1');
   t = t.replace(/_{1,3}([^_]+)_{1,3}/g, '$1');
   // Strip markdown links [text](url)
   t = t.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
-  // Clean up extra whitespace, dashes, pipes
+  // Strip markdown headers
+  t = t.replace(/^#+\s+/gm, '');
+  // Strip CRITICAL:/URGENT:/etc. prefixes
+  t = t.replace(/^(?:CRITICAL|URGENT|PRIORITY|IMPORTANT|MANDATORY)(?:\s+(?:BUG|TASK|FIX|ISSUE))?\s*:\s*/i, '');
+  // Clean up extra whitespace, dashes, pipes, parens
   t = t.replace(/\s*[|—–]\s*$/, '').replace(/^\s*[|—–]\s*/, '');
+  t = t.replace(/\(\s*\)/g, ''); // empty parens from URL removal
   t = t.replace(/\s+/g, ' ').trim();
   // Truncate to ~60 chars at word boundary
   if (t.length > 60) {

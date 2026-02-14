@@ -433,26 +433,42 @@ body{
 .gpu-spark-bar{flex:1;min-width:1px;background:var(--accent);border-radius:1px 1px 0 0;opacity:.7;transition:height .3s ease}
 
 /* ── Responsive ─────────────────────────────────────────────── */
-@media(max-width:1024px){
+@media(max-width:1200px){
   html{height:auto!important;min-height:100vh!important;overflow-y:scroll!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch!important}
-  body{height:auto!important;min-height:100vh!important;overflow-y:visible!important;overflow-x:hidden!important}
-  *{-webkit-overflow-scrolling:touch}
-  .page{overflow-y:visible;flex:none}
+  body{height:auto!important;min-height:100vh!important;overflow:visible!important;display:block!important;-webkit-overflow-scrolling:touch!important;border:none!important}
+  .page{overflow-y:visible;flex:none;padding:16px}
   .page.active{display:flex;flex-direction:column;flex:none}
   .layout{overflow:visible!important;flex:none!important}
-  .main{overflow-y:visible;flex:none}
-  .kanban{grid-template-columns:repeat(2,1fr);flex:none}
-  .kanban-col{min-height:200px}
-  .col-cards{max-height:400px;overflow-y:auto}
+  .main{overflow-y:visible!important;flex:none!important;height:auto!important;padding-left:0!important}
+  .kanban{grid-template-columns:repeat(2,1fr);flex:none;min-height:auto!important;overflow:visible!important}
+  .kanban-col{min-height:auto}
+  .col-cards{max-height:none!important;overflow-y:visible!important}
   .agent-cards-row{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
   .voice-features{grid-template-columns:1fr}
   .layout{flex-direction:column!important;height:auto!important}
-  .sidebar{width:100%!important;min-width:100%!important;border-right:none;border-bottom:1px solid var(--border);max-height:300px;overflow-y:auto;position:relative;padding:10px}
-  #agentsList{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;flex-wrap:nowrap}
-  .agent-card{min-width:200px;max-width:200px;flex-shrink:0}
+  .sidebar{width:100%!important;min-width:100%!important;border-right:none;border-bottom:1px solid var(--border);max-height:none!important;overflow-y:visible!important;position:relative;padding:10px}
+  .sidebar h2{display:inline-block;font-size:.75rem;margin-bottom:8px;margin-right:12px}
   #systemWidget,#gpuWidget{display:none}
+  .sidebar h2:nth-of-type(2),.sidebar h2:nth-of-type(3){display:none}
+  #agentsList{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;mask-image:linear-gradient(to right,#000 90%,transparent);-webkit-mask-image:linear-gradient(to right,#000 90%,transparent)}
+  #agentsList:hover{mask-image:none;-webkit-mask-image:none}
+  .agent-card{min-width:200px;max-width:220px;flex-shrink:0}
   .tab-content.active{min-height:auto;flex:none}
   .scheduled-sections,.workspace-layout{min-height:auto}
+  /* Stats bar fix — ensure visible with proper padding */
+  .stats-bar{flex-wrap:wrap;gap:8px;margin-bottom:16px;padding-top:0}
+  .stat-card{min-width:120px;padding:12px 14px;flex:1 1 calc(33% - 8px)}
+  .stat-number{font-size:1.2rem}
+  /* Org chart responsive */
+  .org-children{flex-wrap:wrap;gap:16px}
+  .org-node{min-width:150px}
+  /* Workspace layout on tablet */
+  .workspace-layout{flex-direction:column;height:auto}
+  .ws-sidebar{width:100%!important;min-width:100%!important;max-height:250px;overflow-y:auto;border-right:none;border-bottom:1px solid var(--border)}
+  /* Job descriptions — allow wrapping */
+  .job-desc{white-space:normal;word-break:break-word;max-width:100%}
+  .job-info{min-width:0;overflow:hidden}
+  .job-row{flex-wrap:wrap}
 }
 @media(max-width:768px){
   .layout{flex-direction:column;height:auto}

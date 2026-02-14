@@ -284,15 +284,22 @@ GPU_STATS_FILE = "/data/gpu_stats.json"
 SYSTEM_STATS_FILE = "/data/system_stats.json"
 
 @app.get("/api/system")
-def get_system_stats():
+def get_system_stats(response: Response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     try:
-        with open(SYSTEM_STATS_FILE, "r") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+        # Re-open file each time to avoid stale Docker mount caches
+        fd = os.open(SYSTEM_STATS_FILE, os.O_RDONLY)
+        try:
+            raw = os.read(fd, 65536).decode("utf-8")
+            return json.loads(raw)
+        finally:
+            os.close(fd)
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
         raise HTTPException(503, "System stats not available")
 
 @app.get("/api/gpu")
-def get_gpu_stats():
+def get_gpu_stats(response: Response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     try:
         with open(GPU_STATS_FILE, "r") as f:
             raw = json.load(f)
@@ -1437,11 +1444,31 @@ def get_live_tasks():
                     kind = parts[2] if len(parts) > 2 else 'task'
                     return f"{agent.title()} {kind.title()}"
 
-                # 2. Search for **bold title** anywhere in text (common pattern)
+                # 2. Check first line — if it's short and clean, use it directly
+                first_line = raw.split('\n')[0].strip()
+                first_line = re.sub(r'\*+', '', first_line).strip()
+                first_line = re.sub(r'^(?:CRITICAL|URGENT|PRIORITY|IMPORTANT|MANDATORY|CONTINUOUS IMPROVEMENT|CONTINUE IMPROVING|QUICK FIX|DOWNLOAD(?:\s*&\s*INDEX)?|RAG KNOWLEDGE BASE)(?:\s+(?:BUG|TASK|FIX|ISSUE))?\s*[:\-—–]\s*', '', first_line, flags=re.IGNORECASE).strip()
+                # Strip remaining ALL-CAPS prefix words (e.g. "DOWNLOAD additional..." → "Additional...")
+                first_line = re.sub(r'^[A-Z]{4,}(?:\s+[A-Z]{3,})*\s*[:\-—–]?\s*', '', first_line).strip()
+                # Capitalize first letter if needed
+                if first_line and first_line[0].islower():
+                    first_line = first_line[0].upper() + first_line[1:]
+                first_line = re.sub(r'[\s:,\-]+$', '', first_line).strip()
+                if 5 < len(first_line) <= 60:
+                    return first_line
+                if len(first_line) > 60:
+                    return _truncate(first_line)
+
+                # 3. Search for **bold title** anywhere in text (common pattern)
                 # Find ALL bold matches, pick the best one (skip short labels like "Issue:" or "Task:")
                 bold_matches = re.findall(r'\*\*(.+?)\*\*', raw[:500])
                 for candidate in bold_matches:
                     candidate = candidate.strip().rstrip(':')
+                    # Strip CRITICAL/URGENT prefixes from bold text too
+                    candidate = re.sub(r'^(?:CRITICAL|URGENT|PRIORITY|IMPORTANT|MANDATORY)(?:\s+(?:BUG|TASK|FIX|ISSUE))?\s*:\s*', '', candidate, flags=re.IGNORECASE).strip()
+                    # Strip URLs from candidates
+                    candidate = re.sub(r'\(?https?://[^\s)]+\)?\s*', '', candidate).strip()
+                    candidate = re.sub(r'\s+', ' ', candidate).strip()
                     # Skip generic labels that aren't descriptive
                     if len(candidate) < 8 and candidate.lower() in ('issue', 'task', 'bug', 'fix', 'note', 'todo', 'goal'):
                         # Try combining label with text after **label:** 
@@ -1474,8 +1501,12 @@ def get_live_tasks():
                     # Strip inline URLs (including parenthesized ones)
                     line = re.sub(r'\(?https?://[^\s)]+\)?', '', line).strip()
                     # Strip leading prefix labels like "CRITICAL:", "BUG:", "PRIORITY:", compound "URGENT BUG:", etc.
-                    line = re.sub(r'^(?:CRITICAL|URGENT|PRIORITY|IMPORTANT|MANDATORY)(?:\s+(?:BUG|TASK|FIX|ISSUE))?\s*:\s*', '', line, flags=re.IGNORECASE).strip()
+                    line = re.sub(r'^(?:CRITICAL|URGENT|PRIORITY|IMPORTANT|MANDATORY|CONTINUOUS IMPROVEMENT|CONTINUE IMPROVING|QUICK FIX|DOWNLOAD(?:\s*&\s*INDEX)?|RAG KNOWLEDGE BASE)(?:\s+(?:BUG|TASK|FIX|ISSUE))?\s*[:\-—–]\s*', '', line, flags=re.IGNORECASE).strip()
                     line = re.sub(r'^(?:BUG|TASK|FIX|AUDIT\s*TASK|TODO|NOTE|ISSUE|ADDITIONAL\s*BUG|ADDITIONAL)\s*:\s*', '', line, flags=re.IGNORECASE).strip()
+                    # Strip remaining ALL-CAPS prefix words
+                    line = re.sub(r'^[A-Z]{4,}(?:\s+[A-Z]{3,})*\s*[:\-—–]?\s*', '', line).strip()
+                    if line and line[0].islower():
+                        line = line[0].upper() + line[1:]
                     # Collapse leftover double spaces
                     line = re.sub(r'  +', ' ', line)
                     # Strip markdown emphasis remnants
