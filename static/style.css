@@ -74,12 +74,12 @@ body{
 .main{flex:1;overflow-y:auto;padding:0 0 0 20px;display:flex;flex-direction:column}
 
 /* ── Agent Cards (sidebar) ──────────────────────────────────── */
-.agent-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:8px;transition:all .15s}
+.agent-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:8px;transition:all .15s;overflow:hidden}
 .agent-card:hover{border-color:var(--accent);box-shadow:0 0 8px rgba(0,188,212,0.1)}
-.agent-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.agent-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;overflow:hidden;min-width:0}
 .agent-emoji{font-size:1.2rem}
-.agent-name{font-weight:600;font-size:.86rem;flex:1}
-.agent-status{font-size:.62rem;padding:3px 8px;border-radius:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.agent-name{font-weight:600;font-size:.86rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.agent-status{font-size:.62rem;padding:3px 8px;border-radius:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;flex-shrink:0;max-width:45%;overflow:hidden;text-overflow:ellipsis}
 .status-idle{background:rgba(0,188,212,.12);color:var(--accent)}
 .status-busy{background:rgba(255,171,64,.12);color:var(--orange)}
 .status-error{background:rgba(255,82,82,.12);color:var(--red)}
