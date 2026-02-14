@@ -98,7 +98,8 @@ body{
 
 /* ── Kanban ─────────────────────────────────────────────────── */
 .kanban{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;flex:1;min-height:0}
-.kanban-col{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px;display:flex;flex-direction:column}
+.kanban-col{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px;display:flex;flex-direction:column;transition:border-color .2s}
+.kanban-col:hover{border-color:rgba(255,255,255,0.12)}
 .col-header{display:flex;align-items:center;gap:8px;font-size:.83rem;font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
 .col-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
 .col-count{margin-left:auto;background:var(--card);padding:2px 8px;border-radius:10px;font-size:.68rem;color:var(--muted)}
