@@ -2,6 +2,8 @@
 const API = '';
 let tasks = [];
 let agents = [];
+let agentStats = [];
+let liveTasks = [];
 let draggedTaskId = null;
 let currentPage = 'dashboard';
 let workspaces = [];
@@ -24,14 +26,22 @@ const AGENT_INFO = {
 // ── Init ───────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   loadAll();
-  setInterval(loadAll, 8000);
+  setInterval(loadAll, 10000);
   // Workspace auto-update polling
   lastWorkspaceCheck = new Date().toISOString();
   setInterval(checkWorkspaceChanges, 5000);
 });
 
 async function loadAll() {
-  await Promise.all([loadTasks(), loadAgents()]);
+  await Promise.all([loadTasks(), loadAgents(), loadAgentStats(), loadLiveTasks()]);
+}
+
+async function loadAgentStats() {
+  try { const res = await fetch(`${API}/api/agent-stats`); agentStats = await res.json(); if (currentPage === 'dashboard') renderAgents(); if (currentPage === 'taskmanager') loadTaskManager(); } catch(e) { console.error('Failed to load agent stats', e); }
+}
+
+async function loadLiveTasks() {
+  try { const res = await fetch(`${API}/api/live-tasks`); liveTasks = await res.json(); if (currentPage === 'dashboard') renderBoard(); } catch(e) { console.error('Failed to load live tasks', e); }
 }
 
 // ── Navigation ─────────────────────────────────────────────────
@@ -91,18 +101,39 @@ async function loadTasks() {
 
 function renderBoard() {
   const cols = { todo: [], in_progress: [], review: [], done: [] };
+  // Add DB tasks
   tasks.forEach(t => { const s = t.status in cols ? t.status : 'todo'; cols[s].push(t); });
+  // Add live tasks (from session files)
+  liveTasks.forEach(t => { const s = t.status in cols ? t.status : 'in_progress'; cols[s].push(t); });
   for (const [status, items] of Object.entries(cols)) {
     const el = document.getElementById(`col-${status}`);
     if (el) {
-      el.innerHTML = items.map(t => taskCardHTML(t)).join('');
+      el.innerHTML = items.map(t => t.is_live ? liveTaskCardHTML(t) : taskCardHTML(t)).join('');
       document.getElementById(`count-${status}`).textContent = items.length;
     }
   }
-  document.querySelectorAll('.task-card').forEach(card => {
+  document.querySelectorAll('.task-card:not(.live-task)').forEach(card => {
     card.addEventListener('dragstart', e => { draggedTaskId = card.dataset.id; card.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
     card.addEventListener('dragend', () => { card.classList.remove('dragging'); document.querySelectorAll('.col-cards').forEach(c => c.classList.remove('drag-over')); });
   });
+}
+
+function liveTaskCardHTML(t) {
+  const info = AGENT_INFO[t.assigned_agent] || { name: t.assigned_agent, emoji: '🤖' };
+  const dur = t.duration ? formatDuration(t.duration) : '';
+  const tokens = t.tokens ? formatTokens(t.tokens) : '';
+  const sourceIcon = t.source === 'cron' ? '⏰' : t.source === 'subagent' ? '🔀' : '🎮';
+  const activePulse = t.status === 'in_progress' ? ' live-pulse' : '';
+  return `<div class="task-card live-task${activePulse}" data-id="${t.id}">
+    <div class="task-live-badge">${sourceIcon} LIVE</div>
+    <div class="task-title">${esc(t.title)}</div>
+    <div class="task-meta">
+      <span class="task-agent">${info.emoji} ${info.name}</span>
+      ${tokens ? `<span class="task-tokens">🔤 ${tokens}</span>` : ''}
+      ${dur ? `<span class="task-duration">⏱ ${dur}</span>` : ''}
+      <span class="task-time">${timeAgo(t.created_at)}</span>
+    </div>
+  </div>`;
 }
 
 function taskCardHTML(t) {
@@ -137,16 +168,33 @@ async function loadAgents() {
 function renderAgents() {
   const el = document.getElementById('agentsList');
   if (!el) return;
-  const busy = agents.filter(a => a.status === 'busy').length;
+  const activeCount = agentStats.filter(s => s.active).length;
   const statusEl = document.getElementById('navStatus');
-  if (statusEl) statusEl.textContent = `${agents.length} agents · ${busy} busy`;
+  if (statusEl) statusEl.textContent = `${agents.length} agents · ${activeCount} active`;
   el.innerHTML = agents.map(a => {
-    const lastAct = a.last_activity ? timeAgo(a.last_activity) : 'No activity';
+    const stats = agentStats.find(s => s.name === a.name);
+    const isActive = stats ? stats.active : a.status === 'busy';
+    const statusLabel = isActive ? 'active' : 'idle';
+    const statusClass = isActive ? 'busy' : 'idle';
+    const tokenStr = stats ? formatTokens(stats.main_session_tokens) + ' / ' + formatTokens(stats.context_limit) : '—';
+    const ctxPct = stats ? stats.context_pct : 0;
+    const ctxBarColor = ctxPct > 80 ? 'var(--red)' : ctxPct > 50 ? 'var(--orange)' : 'var(--green)';
+    const costStr = stats && stats.total_cost > 0 ? `$${stats.total_cost.toFixed(2)}` : '';
+    const sessCount = stats ? stats.active_sessions : 0;
     return `<div class="agent-card">
-      <div class="agent-top"><span class="agent-emoji">${a.emoji}</span><span class="agent-name">${esc(a.display_name)}</span><span class="agent-status status-${a.status}">${a.status}</span></div>
-      <div class="agent-meta"><span>${esc(a.model)}</span><span>${lastAct}</span></div>
+      <div class="agent-top"><span class="agent-emoji">${a.emoji}</span><span class="agent-name">${esc(a.display_name)}</span><span class="agent-status status-${statusClass}">${statusLabel}</span></div>
+      <div class="agent-token-row"><span class="agent-token-label">Context</span><span class="agent-token-value">${tokenStr}</span></div>
+      <div class="agent-ctx-bar"><div class="agent-ctx-fill" style="width:${Math.min(ctxPct,100)}%;background:${ctxBarColor}"></div></div>
+      <div class="agent-meta"><span>${costStr ? '💰 '+costStr : esc(a.model)}</span><span>${sessCount > 0 ? sessCount+' session'+(sessCount>1?'s':'') : 'No sessions'}</span></div>
     </div>`;
   }).join('');
+}
+
+function formatTokens(n) {
+  if (!n) return '0';
+  if (n >= 1_000_000) return (n/1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000) return Math.round(n/1_000) + 'k';
+  return String(n);
 }
 
 async function loadActivity() {
@@ -225,21 +273,30 @@ async function createTask(e) {
 // ══════════════════════════════════════════════════════════════
 
 async function loadTaskManager() {
-  const active = agents.filter(a => a.status === 'busy').length;
-  const idle = agents.filter(a => a.status === 'idle').length;
+  const activeCount = agentStats.filter(s => s.active).length;
+  const idleCount = agents.length - activeCount;
   const error = agents.filter(a => a.status === 'error').length;
   document.getElementById('stat-total').textContent = agents.length;
-  document.getElementById('stat-active').textContent = active;
-  document.getElementById('stat-idle').textContent = idle;
-  document.getElementById('stat-busy').textContent = active;
+  document.getElementById('stat-active').textContent = activeCount;
+  document.getElementById('stat-idle').textContent = idleCount;
+  document.getElementById('stat-busy').textContent = activeCount;
   document.getElementById('stat-error').textContent = error;
   const row = document.getElementById('agentCardsRow');
-  const taskCounts = {}, doneCounts = {};
-  tasks.forEach(t => { if (t.assigned_agent) taskCounts[t.assigned_agent] = (taskCounts[t.assigned_agent] || 0) + 1; });
-  tasks.filter(t => t.status === 'done').forEach(t => { if (t.assigned_agent) doneCounts[t.assigned_agent] = (doneCounts[t.assigned_agent] || 0) + 1; });
   row.innerHTML = agents.map(a => {
-    const sc = a.status === 'busy' ? 'background:rgba(255,171,64,.15);color:#ffab40' : a.status === 'error' ? 'background:rgba(255,82,82,.15);color:#ff5252' : 'background:rgba(0,188,212,.15);color:#00bcd4';
-    return `<div class="agent-card-lg"><div class="agent-card-lg-top"><div class="agent-avatar">${a.emoji}</div><div class="agent-card-lg-info"><h3>${esc(a.display_name)}</h3><div class="model-tag">${esc(a.model)}</div></div><span class="agent-status-pill" style="${sc}">${a.status}</span></div><div class="agent-card-lg-stats"><div class="agent-stat"><span class="num">${taskCounts[a.name]||0}</span><span class="lbl">Tasks</span></div><div class="agent-stat"><span class="num">${doneCounts[a.name]||0}</span><span class="lbl">Done</span></div><div class="agent-stat"><span class="num">${a.last_activity ? timeAgo(a.last_activity) : 'Never'}</span><span class="lbl">Last Active</span></div></div></div>`;
+    const stats = agentStats.find(s => s.name === a.name);
+    const isActive = stats ? stats.active : false;
+    const statusLabel = isActive ? 'active' : 'idle';
+    const sc = isActive ? 'background:rgba(255,171,64,.15);color:#ffab40' : 'background:rgba(0,188,212,.15);color:#00bcd4';
+    const tokenStr = stats ? formatTokens(stats.main_session_tokens) + ' / ' + formatTokens(stats.context_limit) : '—';
+    const ctxPct = stats ? stats.context_pct : 0;
+    const ctxColor = ctxPct > 80 ? 'var(--red)' : ctxPct > 50 ? 'var(--orange)' : 'var(--green)';
+    const costStr = stats ? `$${stats.total_cost.toFixed(2)}` : '$0.00';
+    const sessCount = stats ? stats.session_count : 0;
+    const activeSess = stats ? stats.active_sessions : 0;
+    return `<div class="agent-card-lg"><div class="agent-card-lg-top"><div class="agent-avatar">${a.emoji}</div><div class="agent-card-lg-info"><h3>${esc(a.display_name)}</h3><div class="model-tag">${esc(stats?.model || a.model)}</div></div><span class="agent-status-pill" style="${sc}">${statusLabel}</span></div>
+    <div class="agent-ctx-row"><span>Context: ${tokenStr}</span><span style="color:${ctxColor}">${ctxPct}%</span></div>
+    <div class="agent-ctx-bar-lg"><div class="agent-ctx-fill" style="width:${Math.min(ctxPct,100)}%;background:${ctxColor}"></div></div>
+    <div class="agent-card-lg-stats"><div class="agent-stat"><span class="num">${sessCount}</span><span class="lbl">Sessions</span></div><div class="agent-stat"><span class="num">${activeSess}</span><span class="lbl">Active</span></div><div class="agent-stat"><span class="num">${costStr}</span><span class="lbl">Cost</span></div></div></div>`;
   }).join('');
 }
 

@@ -1,7 +1,7 @@
-"""Mission Control — FastAPI Backend (Phase 3)"""
-import os, json, time, uuid, sqlite3, glob, httpx
+"""Mission Control — FastAPI Backend (Phase 3 + Live Data)"""
+import os, json, time, uuid, sqlite3, glob, httpx, re
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -834,6 +834,310 @@ def openclaw_webhook(event: WebhookEvent):
     conn.commit()
     conn.close()
     return {"ok": True}
+
+# ── Agent Stats (live from session files) ───────────────────────
+
+MODEL_CONTEXT_LIMITS = {
+    "claude-opus-4-6": 1_000_000,
+    "claude-sonnet-4.5": 200_000,
+    "claude-sonnet-4-20250514": 200_000,
+    "claude-3-5-sonnet": 200_000,
+}
+
+def _parse_session_stats(agent_dir: str) -> Dict[str, Any]:
+    """Parse session files for an agent to extract token usage and task info."""
+    sessions_file = os.path.join(agent_dir, "sessions", "sessions.json")
+    if not os.path.exists(sessions_file):
+        return {"sessions": [], "total_tokens": 0, "total_cost": 0, "active": False, "model": ""}
+
+    try:
+        with open(sessions_file, "r") as f:
+            sessions_data = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {"sessions": [], "total_tokens": 0, "total_cost": 0, "active": False, "model": ""}
+
+    total_tokens = 0
+    total_cost = 0.0
+    model = ""
+    active = False
+    session_details = []
+    now_ms = int(time.time() * 1000)
+
+    for session_key, sess_info in sessions_data.items():
+        sid = sess_info.get("sessionId", "")
+        updated_at = sess_info.get("updatedAt", 0)
+        # Consider active if updated in last 60 seconds
+        is_active = (now_ms - updated_at) < 60_000
+
+        # Find the jsonl file
+        jsonl_path = os.path.join(agent_dir, "sessions", f"{sid}.jsonl")
+        if not os.path.exists(jsonl_path):
+            continue
+
+        # Read last few lines to get latest usage
+        sess_tokens = 0
+        sess_cost = 0.0
+        sess_model = ""
+        first_user_msg = ""
+        try:
+            # For token usage, read the last 50 lines (usage accumulates)
+            with open(jsonl_path, "rb") as f:
+                # Seek to end, read backwards for efficiency
+                f.seek(0, 2)
+                fsize = f.tell()
+                # Read last 100KB max for usage data
+                read_size = min(fsize, 100_000)
+                f.seek(max(0, fsize - read_size))
+                tail = f.read().decode("utf-8", errors="replace")
+                lines = tail.strip().split("\n")
+
+                for line in reversed(lines):
+                    try:
+                        entry = json.loads(line)
+                        msg = entry.get("message", {})
+                        usage = msg.get("usage", {})
+                        if usage and usage.get("totalTokens", 0) > sess_tokens:
+                            sess_tokens = usage["totalTokens"]
+                            cost_data = usage.get("cost", {})
+                            sess_cost = cost_data.get("total", 0) if isinstance(cost_data, dict) else 0
+                            sess_model = msg.get("model", "") or entry.get("model", "")
+                            break  # Last message with usage has the highest token count
+                    except (json.JSONDecodeError, KeyError):
+                        continue
+
+                # Get first user message for task description
+                f.seek(0)
+                for raw_line in f:
+                    try:
+                        entry = json.loads(raw_line)
+                        if entry.get("type") == "message":
+                            msg = entry.get("message", {})
+                            if msg.get("role") == "user":
+                                content = msg.get("content", "")
+                                if isinstance(content, list):
+                                    for c in content:
+                                        if isinstance(c, dict) and c.get("type") == "text":
+                                            first_user_msg = c["text"][:200]
+                                            break
+                                elif isinstance(content, str):
+                                    first_user_msg = content[:200]
+                                break
+                    except (json.JSONDecodeError, KeyError):
+                        continue
+        except OSError:
+            continue
+
+        total_tokens += sess_tokens
+        total_cost += sess_cost
+        if sess_model:
+            model = sess_model
+        if is_active:
+            active = True
+
+        session_details.append({
+            "key": session_key,
+            "sessionId": sid[:8],
+            "tokens": sess_tokens,
+            "cost": round(sess_cost, 4),
+            "model": sess_model,
+            "active": is_active,
+            "updatedAt": updated_at,
+            "task": first_user_msg,
+        })
+
+    return {
+        "sessions": session_details,
+        "total_tokens": total_tokens,
+        "total_cost": round(total_cost, 4),
+        "active": active,
+        "model": model,
+    }
+
+
+@app.get("/api/agent-stats")
+def get_agent_stats():
+    """Return live token usage and status for all agents from session files."""
+    agents_dir = os.path.join(OPENCLAW_HOME, "agents")
+    agent_names = {
+        "main": {"display": "Mike", "emoji": "🎯"},
+        "dev": {"display": "Dev", "emoji": "💻"},
+        "trading": {"display": "Trading / AA", "emoji": "📈"},
+        "it-support": {"display": "IT Support", "emoji": "🔧"},
+        "voice": {"display": "Voice", "emoji": "🎙️"},
+        "troubleshoot": {"display": "Troubleshoot", "emoji": "🔍"},
+    }
+    result = []
+    for name, info in agent_names.items():
+        agent_dir = os.path.join(agents_dir, name)
+        if not os.path.isdir(agent_dir):
+            continue
+        stats = _parse_session_stats(agent_dir)
+        ctx_limit = MODEL_CONTEXT_LIMITS.get(stats["model"], 200_000)
+        # Get the main session's tokens for context %
+        main_session_tokens = 0
+        for s in stats["sessions"]:
+            if s["key"].endswith(":main") or s["key"] == f"agent:{name}:main":
+                main_session_tokens = s["tokens"]
+                break
+        # If no main session, use the largest active session
+        if not main_session_tokens:
+            active_sessions = [s for s in stats["sessions"] if s["active"]]
+            if active_sessions:
+                main_session_tokens = max(s["tokens"] for s in active_sessions)
+
+        result.append({
+            "name": name,
+            "display_name": info["display"],
+            "emoji": info["emoji"],
+            "model": stats["model"],
+            "active": stats["active"],
+            "total_tokens": stats["total_tokens"],
+            "main_session_tokens": main_session_tokens,
+            "context_limit": ctx_limit,
+            "context_pct": round(main_session_tokens / ctx_limit * 100, 1) if ctx_limit else 0,
+            "total_cost": stats["total_cost"],
+            "session_count": len(stats["sessions"]),
+            "active_sessions": len([s for s in stats["sessions"] if s["active"]]),
+        })
+    return result
+
+
+@app.get("/api/live-tasks")
+def get_live_tasks():
+    """Extract real tasks from agent session files for the kanban board."""
+    agents_dir = os.path.join(OPENCLAW_HOME, "agents")
+    tasks_list = []
+    now_ms = int(time.time() * 1000)
+
+    for agent_name in os.listdir(agents_dir):
+        agent_dir = os.path.join(agents_dir, agent_name)
+        sessions_file = os.path.join(agent_dir, "sessions", "sessions.json")
+        if not os.path.exists(sessions_file):
+            continue
+        try:
+            with open(sessions_file, "r") as f:
+                sessions_data = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            continue
+
+        for session_key, sess_info in sessions_data.items():
+            sid = sess_info.get("sessionId", "")
+            updated_at = sess_info.get("updatedAt", 0)
+
+            # Skip main/mobile sessions — they're not discrete tasks
+            # Focus on subagent, cron, and control sessions
+            is_subagent = ":subagent:" in session_key
+            is_cron = ":cron:" in session_key and ":run:" in session_key
+            is_control = ":control:" in session_key
+
+            if not (is_subagent or is_cron or is_control):
+                continue
+
+            jsonl_path = os.path.join(agent_dir, "sessions", f"{sid}.jsonl")
+            if not os.path.exists(jsonl_path):
+                continue
+
+            # Determine status
+            age_ms = now_ms - updated_at
+            is_active = age_ms < 60_000
+
+            # Read first user message for task title and session start time
+            title = ""
+            started_at = ""
+            total_tokens = 0
+            model = ""
+            try:
+                with open(jsonl_path, "r") as f:
+                    for raw_line in f:
+                        try:
+                            entry = json.loads(raw_line)
+                            if entry.get("type") == "session":
+                                started_at = entry.get("timestamp", "")
+                            if entry.get("type") == "message":
+                                msg = entry.get("message", {})
+                                if msg.get("role") == "user" and not title:
+                                    content = msg.get("content", "")
+                                    if isinstance(content, list):
+                                        for c in content:
+                                            if isinstance(c, dict) and c.get("type") == "text":
+                                                title = c["text"][:300]
+                                                break
+                                    elif isinstance(content, str):
+                                        title = content[:300]
+                        except json.JSONDecodeError:
+                            continue
+                        if title and started_at:
+                            break
+
+                # Get token usage from end of file
+                with open(jsonl_path, "rb") as f:
+                    f.seek(0, 2)
+                    fsize = f.tell()
+                    read_size = min(fsize, 50_000)
+                    f.seek(max(0, fsize - read_size))
+                    tail = f.read().decode("utf-8", errors="replace")
+                    for line in reversed(tail.strip().split("\n")):
+                        try:
+                            entry = json.loads(line)
+                            usage = entry.get("message", {}).get("usage", {})
+                            if usage and usage.get("totalTokens", 0) > total_tokens:
+                                total_tokens = usage["totalTokens"]
+                                model = entry.get("message", {}).get("model", "")
+                                break
+                        except (json.JSONDecodeError, KeyError):
+                            continue
+            except OSError:
+                continue
+
+            if not title:
+                continue
+
+            # Clean up title: remove [cron:...] and [date] prefixes, take first line
+            clean_title = re.sub(r'\[cron:[^\]]+\]\s*', '', title)
+            clean_title = re.sub(r'\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+GMT[^\]]*\]\s*', '', clean_title)
+            clean_title = clean_title.split('\n')[0][:150]
+
+            # Determine kanban status
+            # Check for deleted sessions (completed)
+            if is_active:
+                status = "in_progress"
+            elif age_ms < 300_000:  # last 5 min
+                status = "review"  # recently finished, needs review
+            else:
+                status = "done"
+
+            # Duration
+            duration = None
+            if started_at and updated_at:
+                try:
+                    start_ts = datetime.fromisoformat(started_at.replace("Z", "+00:00")).timestamp()
+                    duration = (updated_at / 1000) - start_ts
+                except:
+                    pass
+
+            # Determine source type
+            source = "subagent" if is_subagent else "cron" if is_cron else "control"
+
+            tasks_list.append({
+                "id": f"live-{sid[:8]}",
+                "title": clean_title,
+                "assigned_agent": agent_name,
+                "status": status,
+                "priority": "medium",
+                "source": source,
+                "session_key": session_key,
+                "tokens": total_tokens,
+                "model": model,
+                "created_at": started_at,
+                "updated_at": datetime.fromtimestamp(updated_at / 1000, tz=timezone.utc).isoformat() if updated_at else "",
+                "duration": duration,
+                "is_live": True,
+            })
+
+    # Sort: active first, then by updated_at desc
+    tasks_list.sort(key=lambda t: (0 if t["status"] == "in_progress" else 1, -(t.get("duration") or 0)))
+    return tasks_list
+
 
 # ── Static files ────────────────────────────────────────────────
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "static")

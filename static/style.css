@@ -393,3 +393,19 @@ body{
   .topnav-right{margin-left:8px}
   .webcam-overlay{display:none}
 }
+
+/* ── Live Data Styles ──────────────────────────────────── */
+.agent-token-row{display:flex;justify-content:space-between;font-size:.7rem;color:var(--muted);margin-top:4px;padding:0 2px}
+.agent-token-label{opacity:.7}
+.agent-token-value{font-family:monospace;color:var(--text)}
+.agent-ctx-bar,.agent-ctx-bar-lg{height:4px;background:var(--border);border-radius:2px;margin-top:3px;overflow:hidden}
+.agent-ctx-bar-lg{height:6px;margin:4px 12px 8px}
+.agent-ctx-fill{height:100%;border-radius:2px;transition:width .5s ease}
+.agent-ctx-row{display:flex;justify-content:space-between;font-size:.75rem;padding:8px 12px 0;color:var(--muted)}
+
+/* Live task cards */
+.task-live-badge{font-size:.6rem;font-weight:700;color:var(--green);letter-spacing:.5px;margin-bottom:2px}
+.live-task{border-left:3px solid var(--green) !important}
+.live-task.live-pulse{animation:livePulse 2s ease-in-out infinite}
+@keyframes livePulse{0%,100%{border-left-color:var(--green)}50%{border-left-color:var(--orange)}}
+.task-tokens{font-size:.65rem;color:var(--muted);font-family:monospace}
