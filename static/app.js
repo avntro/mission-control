@@ -232,11 +232,16 @@ function renderBoard() {
       const expanded = el.dataset.expanded === 'true';
       const visible = expanded ? items : items.slice(0, CARD_LIMIT);
       const hidden = items.length - visible.length;
-      el.innerHTML = visible.map(t => t.is_live ? liveTaskCardHTML(t) : taskCardHTML(t)).join('');
-      if (hidden > 0) {
-        el.innerHTML += `<button class="btn btn-sm" style="width:100%;margin-top:4px;text-align:center;color:var(--accent)" onclick="this.parentElement.dataset.expanded='true';renderBoard()">Show ${hidden} more…</button>`;
-      } else if (expanded && items.length > CARD_LIMIT) {
-        el.innerHTML += `<button class="btn btn-sm" style="width:100%;margin-top:4px;text-align:center;color:var(--accent)" onclick="this.parentElement.dataset.expanded='false';renderBoard()">Show less</button>`;
+      if (items.length === 0) {
+        const emptyMsg = status === 'todo' ? 'No tasks queued' : status === 'in_progress' ? 'Nothing running' : status === 'review' ? 'Nothing to review' : 'No completed tasks';
+        el.innerHTML = `<div class="col-empty">${emptyMsg}</div>`;
+      } else {
+        el.innerHTML = visible.map(t => t.is_live ? liveTaskCardHTML(t) : taskCardHTML(t)).join('');
+        if (hidden > 0) {
+          el.innerHTML += `<button class="btn btn-sm" style="width:100%;margin-top:4px;text-align:center;color:var(--accent)" onclick="this.parentElement.dataset.expanded='true';renderBoard()">Show ${hidden} more…</button>`;
+        } else if (expanded && items.length > CARD_LIMIT) {
+          el.innerHTML += `<button class="btn btn-sm" style="width:100%;margin-top:4px;text-align:center;color:var(--accent)" onclick="this.parentElement.dataset.expanded='false';renderBoard()">Show less</button>`;
+        }
       }
       document.getElementById(`count-${status}`).textContent = items.length;
     }
@@ -724,7 +729,7 @@ function renderAttachmentsSection(t) {
     html += '<div style="color:var(--muted);font-size:.83rem;padding:8px 0">No attachments yet</div>';
   }
   // Upload hint (for future use)
-  if (t.id && !t.is_live) {
+  if (t.id) {
     html += `<div style="margin-top:8px"><button class="btn btn-sm" onclick="promptAttachmentUrl('${t.id}')">➕ Add Image URL</button></div>`;
   }
   html += '</div>';
@@ -738,7 +743,7 @@ function promptAttachmentUrl(taskId) {
   fetch(`${API}/api/tasks/${taskId}/attachments`, {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ task_id: taskId, filename, url, mime_type: 'image/png', uploaded_by: 'user' })
-  }).then(() => openDetail(taskId)).catch(console.error);
+  }).then(() => { if (taskId.startsWith('live-')) openLiveDetail(taskId); else openDetail(taskId); }).catch(console.error);
 }
 
 function openLightbox(url) {
@@ -763,41 +768,89 @@ function closeLightbox() {
 function closeDetail() { document.getElementById('detailModal').classList.remove('open'); const pills = document.querySelector('#detailModal .header-pills'); if (pills) pills.remove(); }
 function closeDetailIfOutside(e) { if (e.target === e.currentTarget) closeDetail(); }
 
-function openLiveDetail(id) {
+async function openLiveDetail(id) {
+  // Try to use unified modal via API (merges live + DB data with comments/history/attachments)
+  try {
+    const res = await fetch(`${API}/api/tasks/${id}`);
+    if (res.ok) {
+      const t = await res.json();
+      t.is_live = true;
+      // Find live task for source info
+      const lt = liveTasks.find(x => x.id === id);
+      if (lt) { t.source = lt.source; t.session_key = lt.session_key; }
+      document.getElementById('detailTitle').textContent = `${shortId(t.id)} ${t.title}`;
+      const headerEl = document.querySelector('#detailModal .modal-header');
+      let existingPills = headerEl.querySelector('.header-pills');
+      if (!existingPills) { existingPills = document.createElement('div'); existingPills.className = 'header-pills'; headerEl.insertBefore(existingPills, headerEl.querySelector('.modal-close')); }
+      const statusPillClass = t.status === 'in_progress' ? 'pill-live' : t.status === 'done' ? 'pill-done' : t.status === 'review' ? 'pill-review' : 'pill-todo';
+      const statusLabel = t.status === 'in_progress' ? '🔄 LIVE' : t.status === 'done' ? '✅ Done' : t.status === 'review' ? '👀 Review' : '📋 Todo';
+      const sourceIcon = t.source === 'cron' ? '⏰' : t.source === 'subagent' ? '🔀' : '🎮';
+      const sourceLabel = t.source === 'cron' ? 'Cron Job' : t.source === 'subagent' ? 'Sub-agent' : 'Interactive';
+      existingPills.innerHTML = `<span class="status-pill ${statusPillClass}">${statusLabel}</span><span class="status-pill pill-priority">${sourceIcon} ${sourceLabel}</span>`;
+
+      // 1. Status buttons
+      let html = `<div class="premium-actions">${['todo','in_progress','review','done'].map(s => `<button class="btn btn-sm ${t.status===s?'btn-primary':''}" onclick="moveTask('${t.id}','${s}')">${s.replace('_',' ')}</button>`).join('')}<button class="btn btn-sm btn-danger" onclick="deleteTask('${t.id}')">🗑️</button></div>`;
+
+      // 2-6. Agent + grid + session
+      html += buildPremiumModal(t, true);
+
+      // 7. Description
+      if (t.description) html += `<div class="detail-section"><h3>Description</h3><div class="detail-desc">${renderMarkdown(t.description)}</div></div>`;
+
+      // Attachments
+      html += renderAttachmentsSection(t);
+
+      // Live session info
+      html += `<div class="detail-section"><h3>Live Session Info</h3><div style="font-size:.83rem;color:var(--muted);line-height:1.8">
+        <div>📡 <strong>Source:</strong> ${sourceLabel}</div>
+        ${t.updated_at ? `<div>🔄 <strong>Last Update:</strong> <span data-time-ago="${t.updated_at}">${timeAgo(t.updated_at)}</span></div>` : ''}
+        ${t.session_key ? `<div>🔑 <strong>Session:</strong> <code style="font-size:.75rem">${esc(t.session_key)}</code></div>` : ''}
+      </div></div>`;
+
+      // 8. Comments & Logs
+      if (t.comments && t.comments.length) {
+        html += `<div class="detail-section"><h3>Comments &amp; Logs (${t.comments.length})</h3><div class="comments-scroll">`;
+        t.comments.forEach(c => {
+          const cA = agents.find(a => a.name === c.agent);
+          const cN = cA ? cA.display_name : (c.agent || 'System');
+          html += `<div class="comment-item type-${c.type}"><div class="comment-header"><span><span class="comment-agent">${esc(cN)}</span><span class="comment-type">${c.type}</span></span><span data-time-ago="${c.created_at}">${timeAgo(c.created_at)}</span></div><div class="comment-content">${esc(c.content)}</div></div>`;
+        });
+        html += '</div></div>';
+      }
+
+      // 9. History
+      if (t.history && t.history.length) {
+        html += `<div class="detail-section"><h3>History</h3><div class="history-scroll"><div class="history-list">`;
+        t.history.forEach(h => {
+          html += `<div class="history-item"><span class="history-time" data-time-ago="${h.created_at}">${timeAgo(h.created_at)}</span><span class="history-action">${h.action.replace(/_/g,' ')}</span><span class="history-detail">— ${esc(h.details || '')}</span></div>`;
+        });
+        html += '</div></div></div>';
+      }
+
+      // 10. Approve/Reject for review tasks
+      if (t.status === 'review') {
+        html += `<div class="detail-section"><div class="task-review-actions" style="justify-content:center"><button class="btn-approve" style="padding:10px 24px;font-size:.9rem" onclick="approveTask('${t.id}')">✅ Approve &amp; Mark Done</button><button class="btn-reject" style="padding:10px 24px;font-size:.9rem" onclick="rejectTask('${t.id}')">↩️ Reject &amp; Send Back</button></div></div>`;
+      }
+
+      // 11. Add Comment
+      html += `<div class="detail-section"><h3>Add Comment</h3><textarea id="commentText" rows="3" placeholder="Add a comment..." style="width:100%;padding:10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--card);color:var(--text);font-family:inherit;font-size:.83rem;margin-bottom:8px"></textarea><button class="btn btn-sm" style="background:var(--red);color:#fff;border-color:var(--red)" onclick="addComment('${t.id}')">Add Comment</button></div>`;
+
+      document.getElementById('detailBody').innerHTML = html;
+      document.getElementById('detailModal').classList.add('open');
+      return;
+    }
+  } catch(e) { console.error('Unified modal failed, falling back:', e); }
+
+  // Fallback: use local live task data if API fails
   const t = liveTasks.find(lt => lt.id === id);
   if (!t) return;
   document.getElementById('detailTitle').textContent = `${shortId(t.id)} ${t.title}`;
-  // Add status pills to header
   const headerEl = document.querySelector('#detailModal .modal-header');
   let existingPills = headerEl.querySelector('.header-pills');
   if (!existingPills) { existingPills = document.createElement('div'); existingPills.className = 'header-pills'; headerEl.insertBefore(existingPills, headerEl.querySelector('.modal-close')); }
-  const statusPillClass = t.status === 'in_progress' ? 'pill-live' : t.status === 'done' ? 'pill-done' : 'pill-review';
-  const statusLabel = t.status === 'in_progress' ? '🔄 LIVE' : t.status === 'done' ? '✅ Done' : '👀 Review';
-  const sourceIcon = t.source === 'cron' ? '⏰' : t.source === 'subagent' ? '🔀' : '🎮';
-  const sourceLabel = t.source === 'cron' ? 'Cron Job' : t.source === 'subagent' ? 'Sub-agent' : 'Interactive';
-  existingPills.innerHTML = `<span class="status-pill ${statusPillClass}">${statusLabel}</span><span class="status-pill pill-priority">${sourceIcon} ${sourceLabel}</span>`;
-
-  let html = '';
-
-  // Status badge + agent + grid + session
-  html += buildPremiumModal(t, true);
-
-  // Description
+  existingPills.innerHTML = `<span class="status-pill pill-live">🔄 LIVE</span>`;
+  let html = buildPremiumModal(t, true);
   if (t.description) html += `<div class="detail-section"><h3>Description</h3><div class="detail-desc">${renderMarkdown(t.description)}</div></div>`;
-  html += renderAttachmentsSection(t);
-
-  // Live session info
-  html += `<div class="detail-section"><h3>Live Session Info</h3><div style="font-size:.83rem;color:var(--muted);line-height:1.8">
-    <div>📡 <strong>Source:</strong> ${sourceLabel}</div>
-    ${t.updated_at ? `<div>🔄 <strong>Last Update:</strong> <span data-time-ago="${t.updated_at}">${timeAgo(t.updated_at)}</span></div>` : ''}
-    ${t.priority ? `<div>📊 <strong>Priority:</strong> ${t.priority}</div>` : ''}
-  </div></div>`;
-
-  // Approve/Reject buttons for review tasks
-  if (t.status === 'review') {
-    html += `<div class="detail-section"><div class="task-review-actions" style="justify-content:center"><button class="btn-approve" style="padding:10px 24px;font-size:.9rem" onclick="approveTask('${t.id}')">✅ Approve &amp; Mark Done</button><button class="btn-reject" style="padding:10px 24px;font-size:.9rem" onclick="rejectTask('${t.id}')">↩️ Reject &amp; Send Back</button></div></div>`;
-  }
-
   document.getElementById('detailBody').innerHTML = html;
   document.getElementById('detailModal').classList.add('open');
 }
@@ -824,7 +877,7 @@ async function approveAllReview() {
   await Promise.all(reviewItems.map(t => fetch(`${API}/api/tasks/${t.id}/approve`, { method:'POST' })));
   closeDetail(); await Promise.all([loadTasks(), loadLiveTasks()]); renderBoard();
 }
-async function addComment(taskId) { const text = document.getElementById('commentText').value.trim(); if (!text) return; await fetch(`${API}/api/comments`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({task_id:taskId,content:text,agent:'',type:'comment'}) }); openDetail(taskId); }
+async function addComment(taskId) { const text = document.getElementById('commentText').value.trim(); if (!text) return; await fetch(`${API}/api/comments`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({task_id:taskId,content:text,agent:'',type:'comment'}) }); if (taskId.startsWith('live-')) { openLiveDetail(taskId); } else { openDetail(taskId); } }
 
 function openCreateModal() { document.getElementById('createModal').classList.add('open'); }
 function closeCreate() { document.getElementById('createModal').classList.remove('open'); }

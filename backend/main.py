@@ -405,12 +405,37 @@ def list_tasks(status: Optional[str] = None, agent: Optional[str] = None):
 
 @app.get("/api/tasks/{task_id}")
 def get_task(task_id: str):
+    print(f"[get_task] called with task_id={task_id}", flush=True)
     conn = get_db()
     row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-    if not row:
+    task = dict(row) if row else None
+    print(f"[get_task] db row found: {row is not None}", flush=True)
+
+    # For live-* tasks, merge session data from JSONL (richer than DB stub)
+    if task_id.startswith("live-"):
+        try:
+            live_list = get_live_tasks(agents="all")
+            print(f"[get_task] Looking for {task_id} in {len(live_list)} live tasks", flush=True)
+            live_match = next((lt for lt in live_list if lt["id"] == task_id), None)
+            print(f"[get_task] Match: {live_match is not None}", flush=True)
+            if live_match:
+                if task is None:
+                    task = live_match
+                else:
+                    # Merge: live data fills in blanks, DB status wins
+                    for k in ["title", "description", "assigned_agent", "model", "cost", "tokens", "duration", "created_at", "source", "session_key"]:
+                        if live_match.get(k) and not task.get(k):
+                            task[k] = live_match[k]
+                    task["is_live"] = True
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+
+    if not task:
         conn.close()
         raise HTTPException(404, "Task not found")
-    task = dict(row)
+
+    # Always attach comments, history, attachments (works for both live and DB tasks)
     comments = conn.execute("SELECT * FROM comments WHERE task_id = ? ORDER BY created_at ASC", (task_id,)).fetchall()
     task["comments"] = [dict(c) for c in comments]
     history = conn.execute(
@@ -441,6 +466,13 @@ def create_task(t: TaskCreate):
 def update_task(task_id: str, t: TaskUpdate):
     conn = get_db()
     row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    if not row and task_id.startswith("live-"):
+        # Create a stub for live tasks so status changes persist
+        ts = now_iso()
+        conn.execute("INSERT INTO tasks (id, title, status, created_at, updated_at) VALUES (?,?,?,?,?)",
+                     (task_id, task_id, "in_progress", ts, ts))
+        conn.commit()
+        row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
     if not row:
         conn.close()
         raise HTTPException(404, "Task not found")

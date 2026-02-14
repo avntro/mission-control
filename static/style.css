@@ -35,7 +35,7 @@ body{
 }
 
 /* ── Top Navigation ─────────────────────────────────────────── */
-.topnav{display:flex;align-items:center;padding:0 20px;height:52px;background:var(--surface);border-bottom:1px solid var(--gold);border-bottom-color:rgba(255,215,0,0.2);position:sticky;top:0;z-index:100;box-shadow:0 1px 20px rgba(0,188,212,0.05)}
+.topnav{display:flex;align-items:center;padding:0 20px;height:52px;background:linear-gradient(180deg,var(--surface) 0%,rgba(34,34,34,0.98) 100%);border-bottom:1px solid var(--gold);border-bottom-color:rgba(255,215,0,0.2);position:sticky;top:0;z-index:100;box-shadow:0 1px 20px rgba(0,188,212,0.05)}
 .topnav-left{display:flex;align-items:center;gap:10px;margin-right:24px}
 .logo{font-size:1.3rem;filter:drop-shadow(0 0 6px rgba(255,215,0,0.4))}
 .brand{font-size:1.05rem;font-weight:700;letter-spacing:-0.3px;white-space:nowrap;background:linear-gradient(135deg,var(--gold),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
@@ -65,8 +65,9 @@ body{
 .btn-danger:hover{background:var(--red);color:#fff}
 
 /* ── Pages ──────────────────────────────────────────────────── */
-.page{display:none;padding:20px 24px;flex:1;overflow-y:auto;min-height:0}
+.page{display:none;padding:20px 24px;flex:1;overflow-y:auto;min-height:0;animation:pageIn .2s ease}
 .page.active{display:flex;flex-direction:column}
+@keyframes pageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
 .page-header h2{font-size:1.3rem;font-weight:700}
 .page-subtitle{font-size:.82rem;color:var(--muted);margin-top:2px}
@@ -110,6 +111,7 @@ body{
 .col-cards{flex:1;display:flex;flex-direction:column;gap:8px;min-height:60px;transition:background .15s;border-radius:var(--radius);padding:4px;overflow-y:auto;position:relative}
 .col-cards:not(:empty)::after{content:'';position:sticky;bottom:0;left:0;right:0;height:24px;background:linear-gradient(transparent,var(--surface));pointer-events:none;flex-shrink:0}
 .col-cards.drag-over{background:rgba(0,188,212,.06);outline:2px dashed rgba(0,188,212,.3);outline-offset:-2px}
+.col-empty{text-align:center;padding:24px 12px;color:var(--muted);font-size:.78rem;opacity:.6}
 
 /* ── Task Cards ─────────────────────────────────────────────── */
 .task-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;cursor:grab;transition:all .15s;position:relative}
