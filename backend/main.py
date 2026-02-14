@@ -415,9 +415,24 @@ async def list_agents():
 
     # Enrich with live status from agent-stats
     agents_dir = os.path.join(OPENCLAW_HOME, "agents")
+    now_ms = int(time.time() * 1000)
     for agent in agents_list:
         stats = _parse_session_stats(os.path.join(agents_dir, agent["name"]))
-        if stats["active"]:
+        # Agent is BUSY if any session updated in last 5 minutes
+        agent_busy = stats["active"]  # _parse_session_stats already uses 5min window
+        if not agent_busy:
+            # Also check sessions.json directly for any session updated in last 5 min
+            sessions_file = os.path.join(agents_dir, agent["name"], "sessions", "sessions.json")
+            try:
+                with open(sessions_file, "r") as f:
+                    sess_data = json.load(f)
+                for v in sess_data.values():
+                    if (now_ms - v.get("updatedAt", 0)) < 300_000:
+                        agent_busy = True
+                        break
+            except:
+                pass
+        if agent_busy:
             agent["status"] = "busy"
         else:
             agent["status"] = "idle"
@@ -1062,8 +1077,8 @@ def _parse_session_stats(agent_dir: str) -> Dict[str, Any]:
     for session_key, sess_info in sessions_data.items():
         sid = sess_info.get("sessionId", "")
         updated_at = sess_info.get("updatedAt", 0)
-        # Consider active if updated in last 60 seconds
-        is_active = (now_ms - updated_at) < 60_000
+        # Consider active if updated in last 5 minutes
+        is_active = (now_ms - updated_at) < 300_000
 
         # Find the jsonl file
         jsonl_path = os.path.join(agent_dir, "sessions", f"{sid}.jsonl")

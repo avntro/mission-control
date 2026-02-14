@@ -27,10 +27,25 @@ const AGENT_INFO = {
 document.addEventListener('DOMContentLoaded', () => {
   loadAll();
   setInterval(loadAll, 10000);
+  // Live-ticking timers: update durations and "time ago" every second
+  setInterval(tickTimers, 1000);
   // Workspace auto-update polling
   lastWorkspaceCheck = new Date().toISOString();
   setInterval(checkWorkspaceChanges, 5000);
 });
+
+function tickTimers() {
+  // Tick task durations (active in_progress tasks)
+  document.querySelectorAll('[data-created-at][data-tick-duration]').forEach(el => {
+    const created = new Date(el.dataset.createdAt).getTime();
+    const elapsed = (Date.now() - created) / 1000;
+    if (elapsed > 0) el.textContent = '⏱ ' + formatDuration(elapsed);
+  });
+  // Tick "time ago" labels
+  document.querySelectorAll('[data-time-ago]').forEach(el => {
+    el.textContent = timeAgo(el.dataset.timeAgo);
+  });
+}
 
 async function loadAll() {
   await Promise.all([loadTasks(), loadAgents(), loadAgentStats(), loadLiveTasks()]);
@@ -137,8 +152,8 @@ function liveTaskCardHTML(t) {
     <div class="task-meta">
       <span class="task-agent">${info.emoji} ${info.name}</span>
       ${tokens ? `<span class="task-tokens">🔤 ${tokens}</span>` : ''}
-      ${dur ? `<span class="task-duration">⏱ ${dur}</span>` : ''}
-      <span class="task-time">${timeAgo(t.created_at)}</span>
+      ${t.status === 'in_progress' && t.created_at ? `<span class="task-duration" data-created-at="${t.created_at}" data-tick-duration>⏱ ${dur}</span>` : (dur ? `<span class="task-duration">⏱ ${dur}</span>` : '')}
+      <span class="task-time" data-time-ago="${t.created_at}">${timeAgo(t.created_at)}</span>
     </div>
   </div>`;
 }
@@ -158,8 +173,8 @@ function taskCardHTML(t) {
     <div class="task-meta">
       <span class="task-agent">${esc(agentLabel)}</span>
       <span class="task-priority priority-${t.priority}">${t.priority}</span>
-      <span class="task-time">${timeAgo(t.created_at)}</span>
-      ${dur ? `<span class="task-duration">⏱ ${dur}</span>` : ''}
+      <span class="task-time" data-time-ago="${t.created_at}">${timeAgo(t.created_at)}</span>
+      ${t.status === 'in_progress' && t.created_at ? `<span class="task-duration" data-created-at="${t.created_at}" data-tick-duration>⏱ ${dur}</span>` : (dur ? `<span class="task-duration">⏱ ${dur}</span>` : '')}
     </div>
   </div>`;
 }
@@ -199,7 +214,7 @@ function renderAgents() {
       <div class="agent-top"><span class="agent-emoji">${a.emoji}</span><span class="agent-name">${esc(a.display_name)}</span><span class="agent-status status-${statusClass}">${statusLabel}</span></div>
       <div class="agent-token-row"><span class="agent-token-label">Context</span><span class="agent-token-value">${tokenStr}</span></div>
       <div class="agent-ctx-bar"><div class="agent-ctx-fill" style="width:${Math.min(ctxPct,100)}%;background:${ctxBarColor}"></div></div>
-      <div class="agent-meta"><span>${costStr ? '💰 '+costStr : esc(a.model)}</span><span>🕐 ${lastAct}</span></div>
+      <div class="agent-meta"><span>${costStr ? '💰 '+costStr : esc(a.model)}</span><span ${a.last_activity ? `data-time-ago="${a.last_activity}"` : ''}>🕐 ${lastAct}</span></div>
     </div>`;
   }).join('');
 }
