@@ -1135,6 +1135,118 @@ setInterval(loadGpuStats, 5000);
 document.addEventListener('DOMContentLoaded', () => setTimeout(loadGpuStats, 500));
 
 // ══════════════════════════════════════════════════════════════
+// AGENT SESSIONS DRILL-DOWN (Task Manager)
+// ══════════════════════════════════════════════════════════════
+
+function openAgentSessions(agentName) {
+  const info = AGENT_INFO[agentName] || { name: agentName, emoji: '🤖', color: '#888' };
+  const stats = agentStats.find(s => s.name === agentName);
+  const sessions = (stats && stats.sessions) ? stats.sessions : [];
+
+  // Classify sessions
+  const classified = sessions.map(s => {
+    const isSubagent = s.key.includes(':subagent:');
+    const isCron = s.key.includes(':cron:');
+    const isMain = s.key.endsWith(':main');
+    const isMobile = s.key.endsWith(':mobile');
+    const isWebchat = s.key.endsWith(':webchat');
+    let typeIcon, typeLabel;
+    if (isSubagent) { typeIcon = '🔀'; typeLabel = 'Sub-agent'; }
+    else if (isCron) { typeIcon = '⏰'; typeLabel = 'Cron'; }
+    else if (isMain) { typeIcon = '🎮'; typeLabel = 'Main'; }
+    else if (isMobile) { typeIcon = '📱'; typeLabel = 'Mobile'; }
+    else if (isWebchat) { typeIcon = '💬'; typeLabel = 'Webchat'; }
+    else { typeIcon = '📡'; typeLabel = 'Session'; }
+
+    // Try to find matching live task for richer detail
+    const liveMatch = liveTasks.find(lt => lt.session_key === s.key);
+
+    return { ...s, typeIcon, typeLabel, isSubagent, isCron, liveMatch };
+  });
+
+  // Sort: active first, then by updatedAt desc
+  classified.sort((a, b) => {
+    if (a.active && !b.active) return -1;
+    if (b.active && !a.active) return 1;
+    return (b.updatedAt || 0) - (a.updatedAt || 0);
+  });
+
+  const activeCount = classified.filter(s => s.active).length;
+  const totalTokens = classified.reduce((sum, s) => sum + (s.tokens || 0), 0);
+  const totalCost = classified.reduce((sum, s) => sum + (s.cost || 0), 0);
+
+  document.getElementById('subagentModalTitle').innerHTML =
+    `${info.emoji} ${esc(info.name)} — All Sessions`;
+
+  let html = '';
+
+  // Summary
+  html += `<div class="subagent-summary">
+    <span class="subagent-summary-item"><span class="subagent-dot dot-active"></span>${activeCount} active</span>
+    <span class="subagent-summary-item"><span class="subagent-dot dot-done"></span>${classified.length - activeCount} idle</span>
+    <span class="subagent-summary-item">📊 ${classified.length} total</span>
+    <span class="subagent-summary-item">🔤 ${formatTokens(totalTokens)}</span>
+    <span class="subagent-summary-item">💰 $${totalCost.toFixed(2)}</span>
+  </div>`;
+
+  if (!classified.length) {
+    html += '<p style="text-align:center;color:var(--muted);padding:32px 0">No sessions found.</p>';
+  } else {
+    html += '<div class="subagent-list">';
+    for (const s of classified) {
+      const statusClass = s.active ? 'running' : 'done';
+      const statusIcon = s.active ? '🔄' : '✅';
+      const statusLabel = s.active ? 'Active' : 'Idle';
+      const modelStr = s.model ? s.model.replace('anthropic/', '').replace('claude-', 'c-') : '—';
+      const costStr = s.cost > 0 ? `$${s.cost.toFixed(2)}` : '—';
+      const tokStr = s.tokens ? formatTokens(s.tokens) : '—';
+      const updatedIso = s.updatedAt ? new Date(s.updatedAt).toISOString() : '';
+
+      // Title: prefer live task title, then session task snippet, then key
+      const title = (s.liveMatch && s.liveMatch.title) ? s.liveMatch.title : (s.task || s.key);
+
+      // Duration from live task if available
+      let durHtml = '';
+      if (s.liveMatch) {
+        if (s.active && s.liveMatch.created_at) {
+          const elapsed = (Date.now() - new Date(s.liveMatch.created_at).getTime()) / 1000;
+          durHtml = `<span class="subagent-dur" data-created-at="${s.liveMatch.created_at}" data-tick-duration>⏱ ${formatDuration(elapsed)}</span>`;
+        } else if (s.liveMatch.duration) {
+          durHtml = `<span class="subagent-dur">⏱ ${formatDuration(s.liveMatch.duration)}</span>`;
+        }
+      }
+
+      // Click handler: if there's a live task, open its detail; otherwise just visual
+      const liveId = s.liveMatch ? s.liveMatch.id : '';
+      const clickAttr = liveId
+        ? `onclick="document.getElementById('subagentModal').classList.remove('open');openLiveDetail('${liveId}')"`
+        : '';
+      const clickClass = liveId ? ' clickable' : '';
+
+      html += `<div class="subagent-row subagent-${statusClass}${clickClass}" ${clickAttr}>
+        <div class="subagent-row-top">
+          <span class="subagent-type-badge">${s.typeIcon} ${s.typeLabel}</span>
+          <span class="subagent-status-badge status-${statusClass}">${statusIcon} ${statusLabel}</span>
+          ${durHtml}
+          ${updatedIso ? `<span class="subagent-time" data-time-ago="${updatedIso}">${timeAgo(updatedIso)}</span>` : ''}
+        </div>
+        <div class="subagent-row-title">${esc(title)}</div>
+        <div class="subagent-row-stats">
+          <span>🔤 ${tokStr}</span>
+          <span>💰 ${costStr}</span>
+          <span>🧠 ${esc(modelStr)}</span>
+          <span class="subagent-session-key">🔑 ${esc(s.sessionId)}</span>
+        </div>
+      </div>`;
+    }
+    html += '</div>';
+  }
+
+  document.getElementById('subagentModalBody').innerHTML = html;
+  document.getElementById('subagentModal').classList.add('open');
+}
+
+// ══════════════════════════════════════════════════════════════
 // SUB-AGENT DRILL-DOWN
 // ══════════════════════════════════════════════════════════════
 

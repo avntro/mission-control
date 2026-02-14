@@ -509,6 +509,13 @@ body{
 .subagent-row-title{font-size:.84rem;color:var(--text);line-height:1.4;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .subagent-row-stats{display:flex;gap:14px;font-size:.72rem;color:var(--muted)}
 .subagent-footer{display:flex;gap:20px;padding:12px 0 4px;border-top:1px solid var(--border);margin-top:12px;font-size:.78rem;color:var(--muted);justify-content:center}
+.subagent-type-badge{font-size:.68rem;padding:2px 7px;border-radius:8px;background:rgba(108,99,255,.12);color:#b0a8ff}
+.subagent-session-key{font-size:.65rem;color:var(--muted);opacity:.6;font-family:monospace}
+.subagent-row.clickable{cursor:pointer}
+.subagent-row:not(.clickable){cursor:default;opacity:.85}
+.subagent-row:not(.clickable):hover{border-color:var(--border);background:var(--card);transform:none}
+.agent-card-lg{cursor:pointer;transition:border-color .15s,transform .1s}
+.agent-card-lg:hover{border-color:var(--accent);transform:translateY(-2px)}
 
 /* ── Scrollable Lists (constrained height + elegant scrollbar) ── */
 .col-cards{max-height:calc(100vh - 320px)}
