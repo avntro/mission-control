@@ -711,3 +711,17 @@ body{
   .reports-grid{grid-template-columns:1fr}
 }
 
+
+/* Task ID badge */
+.task-id {
+  display: inline-block;
+  background: rgba(255,255,255,0.1);
+  color: var(--text-dim, #888);
+  font-size: 0.7rem;
+  font-weight: 600;
+  font-family: monospace;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-right: 4px;
+  vertical-align: middle;
+}

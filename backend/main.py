@@ -1625,6 +1625,8 @@ def get_live_tasks():
 
             if db_status == "done":
                 status = "done"  # User explicitly approved
+            elif db_status == "todo":
+                status = "todo"  # User rejected — sent back to todo
             elif is_active:
                 status = "in_progress"
             else:

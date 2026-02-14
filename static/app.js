@@ -9,6 +9,15 @@ let currentPage = 'dashboard';
 let workspaces = [];
 let orgExpanded = true;
 
+// Generate short display ID for tasks (e.g., "#A3F" from UUID)
+function shortId(id) {
+  if (!id) return '#?';
+  // For live tasks, strip "live-" prefix for the hash
+  const raw = id.replace(/^live-/, '');
+  // Use first 3-4 chars of the ID, uppercased
+  return '#' + raw.substring(0, 4).toUpperCase();
+}
+
 function cleanTitle(title) {
   if (!title) return 'Untitled';
   let t = title;
@@ -247,7 +256,7 @@ function liveTaskCardHTML(t) {
   const badgeClass = t.status === 'in_progress' ? 'task-live-badge' : 'task-live-badge' + (t.status === 'done' ? ' badge-done' : ' badge-review');
   return `<div class="task-card live-task${activePulse}" data-id="${t.id}" onclick="openLiveDetail('${t.id}')">
     <div class="${badgeClass}">${badgeLabel}</div>
-    <div class="task-title">${esc(cleanTitle(t.title))}</div>
+    <div class="task-title"><span class="task-id">${shortId(t.id)}</span> ${esc(cleanTitle(t.title))}</div>
     <div class="task-meta">
       <span class="task-agent">${info.emoji} ${info.name}</span>
       ${tokens ? `<span class="task-tokens">🔤 ${tokens}</span>` : ''}
@@ -274,7 +283,7 @@ function taskCardHTML(t) {
   const tTimeRef = (t.status === 'done' || t.status === 'review') ? (t.completed_at || t.updated_at || t.created_at) : t.created_at;
   const tTimeLabel = (t.status === 'done' || t.status === 'review') ? 'completed ' : '';
   return `<div class="task-card" draggable="true" data-id="${t.id}" onclick="openDetail('${t.id}')">
-    <div class="task-title">${esc(cleanTitle(t.title))}</div>
+    <div class="task-title"><span class="task-id">${shortId(t.id)}</span> ${esc(cleanTitle(t.title))}</div>
     <div class="task-meta">
       <span class="task-agent">${esc(agentLabel)}</span>
       <span class="task-priority priority-${t.priority}">${t.priority}</span>
@@ -621,7 +630,7 @@ async function openDetail(id) {
   try {
     const res = await fetch(`${API}/api/tasks/${id}`);
     const t = await res.json();
-    document.getElementById('detailTitle').textContent = t.title;
+    document.getElementById('detailTitle').textContent = `${shortId(t.id)} ${t.title}`;
     // Add status pills to header
     const headerEl = document.querySelector('#detailModal .modal-header');
     let existingPills = headerEl.querySelector('.header-pills');
@@ -742,7 +751,7 @@ function closeDetailIfOutside(e) { if (e.target === e.currentTarget) closeDetail
 function openLiveDetail(id) {
   const t = liveTasks.find(lt => lt.id === id);
   if (!t) return;
-  document.getElementById('detailTitle').textContent = t.title;
+  document.getElementById('detailTitle').textContent = `${shortId(t.id)} ${t.title}`;
   // Add status pills to header
   const headerEl = document.querySelector('#detailModal .modal-header');
   let existingPills = headerEl.querySelector('.header-pills');
@@ -780,7 +789,18 @@ function openLiveDetail(id) {
 async function moveTask(id, status) { await fetch(`${API}/api/tasks/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status}) }); closeDetail(); await Promise.all([loadTasks(), loadLiveTasks()]); renderBoard(); }
 async function deleteTask(id) { if (!confirm('Delete this task?')) return; await fetch(`${API}/api/tasks/${id}`, { method:'DELETE' }); closeDetail(); await Promise.all([loadTasks(), loadLiveTasks()]); renderBoard(); }
 async function approveTask(id) { await fetch(`${API}/api/tasks/${id}/approve`, { method:'POST' }); closeDetail(); await Promise.all([loadTasks(), loadLiveTasks()]); renderBoard(); }
-async function rejectTask(id) { await fetch(`${API}/api/tasks/${id}/reject`, { method:'POST' }); closeDetail(); await Promise.all([loadTasks(), loadLiveTasks()]); renderBoard(); }
+async function rejectTask(id) {
+  try {
+    console.log('Rejecting task:', id);
+    const res = await fetch(`${API}/api/tasks/${id}/reject`, { method:'POST' });
+    if (!res.ok) { const err = await res.text(); console.error('Reject failed:', res.status, err); alert('Reject failed: ' + err); return; }
+    const data = await res.json();
+    console.log('Reject response:', data);
+    closeDetail();
+    await Promise.all([loadTasks(), loadLiveTasks()]);
+    renderBoard();
+  } catch(e) { console.error('Reject error:', e); alert('Reject error: ' + e.message); }
+}
 async function approveAllReview() {
   const reviewItems = [...tasks.filter(t=>t.status==='review'), ...liveTasks.filter(t=>t.status==='review')];
   if (!reviewItems.length) return;
