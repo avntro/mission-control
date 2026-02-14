@@ -89,6 +89,26 @@ class ActionItemUpdate(BaseModel):
 class FileWriteRequest(BaseModel):
     content: str
 
+class ReportCreate(BaseModel):
+    title: str
+    date: str = ""
+    author: str = ""
+    source_url: str = ""
+    source_type: str = "manual"  # youtube/article/manual
+    tags: List[str] = []
+    content: str = ""
+    screenshots: List[str] = []
+
+class ReportUpdate(BaseModel):
+    title: Optional[str] = None
+    date: Optional[str] = None
+    author: Optional[str] = None
+    source_url: Optional[str] = None
+    source_type: Optional[str] = None
+    tags: Optional[List[str]] = None
+    content: Optional[str] = None
+    screenshots: Optional[List[str]] = None
+
 class ActionItemCreate(BaseModel):
     text: str
     assignee: str = ""
@@ -215,6 +235,19 @@ def init_db():
         standup_id TEXT DEFAULT '',
         created_at TEXT NOT NULL,
         completed_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS reports (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        date TEXT NOT NULL,
+        author TEXT DEFAULT '',
+        source_url TEXT DEFAULT '',
+        source_type TEXT DEFAULT 'manual',
+        tags TEXT DEFAULT '[]',
+        content_path TEXT DEFAULT '',
+        screenshots TEXT DEFAULT '[]',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS attachments (
         id TEXT PRIMARY KEY,
@@ -1649,6 +1682,245 @@ def get_live_tasks():
     tasks_list.sort(key=lambda t: (0 if t["status"] == "in_progress" else 1, -(t.get("duration") or 0)))
     return tasks_list
 
+
+REPORTS_DIR = os.environ.get("REPORTS_DIR", os.path.join(os.path.dirname(__file__), "..", "reports"))
+REPORTS_IMAGES_DIR = os.path.join(REPORTS_DIR, "images")
+
+# ── Reports CRUD ────────────────────────────────────────────────
+@app.get("/api/reports")
+def list_reports(
+    tag: Optional[str] = None,
+    author: Optional[str] = None,
+    q: Optional[str] = None,
+    source_type: Optional[str] = Query(None, alias="from_type"),
+    date_from: Optional[str] = Query(None, alias="from"),
+    date_to: Optional[str] = Query(None, alias="to"),
+    sort: str = "date_desc",
+):
+    conn = get_db()
+    query = "SELECT * FROM reports"
+    params = []
+    wheres = []
+    if tag:
+        wheres.append("tags LIKE ?")
+        params.append(f'%"{tag}"%')
+    if author:
+        wheres.append("author LIKE ?")
+        params.append(f"%{author}%")
+    if date_from:
+        wheres.append("date >= ?")
+        params.append(date_from)
+    if date_to:
+        wheres.append("date <= ?")
+        params.append(date_to)
+    if q:
+        wheres.append("(title LIKE ? OR author LIKE ? OR tags LIKE ?)")
+        params.extend([f"%{q}%", f"%{q}%", f"%{q}%"])
+    if wheres:
+        query += " WHERE " + " AND ".join(wheres)
+    if sort == "title":
+        query += " ORDER BY title ASC"
+    else:
+        query += " ORDER BY date DESC, created_at DESC"
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["tags"] = json.loads(d.get("tags", "[]"))
+        d["screenshots"] = json.loads(d.get("screenshots", "[]"))
+        result.append(d)
+    return result
+
+@app.get("/api/reports/tags")
+def list_report_tags():
+    conn = get_db()
+    rows = conn.execute("SELECT tags FROM reports").fetchall()
+    conn.close()
+    all_tags = set()
+    for r in rows:
+        try:
+            tags = json.loads(r["tags"])
+            all_tags.update(tags)
+        except:
+            pass
+    return sorted(all_tags)
+
+@app.get("/api/reports/authors")
+def list_report_authors():
+    conn = get_db()
+    rows = conn.execute("SELECT DISTINCT author FROM reports WHERE author != '' ORDER BY author").fetchall()
+    conn.close()
+    return [r["author"] for r in rows]
+
+@app.get("/api/reports/search")
+async def search_reports(q: str = ""):
+    """RAG semantic search via localhost:8400"""
+    if not q:
+        return []
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(f"http://localhost:8400/api/search", params={"q": q})
+            if resp.status_code == 200:
+                return resp.json()
+    except:
+        pass
+    # Fallback to text search
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM reports WHERE title LIKE ? OR author LIKE ? OR tags LIKE ? ORDER BY date DESC",
+        (f"%{q}%", f"%{q}%", f"%{q}%")
+    ).fetchall()
+    conn.close()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["tags"] = json.loads(d.get("tags", "[]"))
+        d["screenshots"] = json.loads(d.get("screenshots", "[]"))
+        result.append(d)
+    return result
+
+@app.get("/api/reports/{report_id}")
+def get_report(report_id: str):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM reports WHERE id = ?", (report_id,)).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(404, "Report not found")
+    d = dict(row)
+    d["tags"] = json.loads(d.get("tags", "[]"))
+    d["screenshots"] = json.loads(d.get("screenshots", "[]"))
+    # Read markdown content
+    content_path = d.get("content_path", "")
+    if content_path and os.path.exists(content_path):
+        with open(content_path, "r", encoding="utf-8", errors="replace") as f:
+            d["content"] = f.read()
+    else:
+        d["content"] = ""
+    conn.close()
+    return d
+
+@app.post("/api/reports")
+def create_report(r: ReportCreate):
+    conn = get_db()
+    rid = str(uuid.uuid4())[:8]
+    ts = now_iso()
+    date = r.date or ts[:10]
+    # Save markdown file
+    slug = re.sub(r'[^a-z0-9]+', '-', r.title.lower()).strip('-')[:60]
+    filename = f"{slug}-{rid}.md"
+    os.makedirs(REPORTS_DIR, exist_ok=True)
+    content_path = os.path.join(REPORTS_DIR, filename)
+    with open(content_path, "w", encoding="utf-8") as f:
+        f.write(r.content)
+    conn.execute(
+        "INSERT INTO reports (id, title, date, author, source_url, source_type, tags, content_path, screenshots, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        (rid, r.title, date, r.author, r.source_url, r.source_type,
+         json.dumps(r.tags), content_path, json.dumps(r.screenshots), ts, ts)
+    )
+    conn.commit()
+    row = conn.execute("SELECT * FROM reports WHERE id = ?", (rid,)).fetchone()
+    conn.close()
+    d = dict(row)
+    d["tags"] = json.loads(d.get("tags", "[]"))
+    d["screenshots"] = json.loads(d.get("screenshots", "[]"))
+    return d
+
+@app.put("/api/reports/{report_id}")
+def update_report(report_id: str, r: ReportUpdate):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM reports WHERE id = ?", (report_id,)).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(404, "Report not found")
+    old = dict(row)
+    updates = {"updated_at": now_iso()}
+    for field in ["title", "date", "author", "source_url", "source_type"]:
+        val = getattr(r, field)
+        if val is not None:
+            updates[field] = val
+    if r.tags is not None:
+        updates["tags"] = json.dumps(r.tags)
+    if r.screenshots is not None:
+        updates["screenshots"] = json.dumps(r.screenshots)
+    if r.content is not None:
+        content_path = old.get("content_path", "")
+        if content_path:
+            with open(content_path, "w", encoding="utf-8") as f:
+                f.write(r.content)
+    set_clause = ", ".join(f"{k} = ?" for k in updates)
+    vals = list(updates.values()) + [report_id]
+    conn.execute(f"UPDATE reports SET {set_clause} WHERE id = ?", vals)
+    conn.commit()
+    row = conn.execute("SELECT * FROM reports WHERE id = ?", (report_id,)).fetchone()
+    conn.close()
+    d = dict(row)
+    d["tags"] = json.loads(d.get("tags", "[]"))
+    d["screenshots"] = json.loads(d.get("screenshots", "[]"))
+    return d
+
+@app.delete("/api/reports/{report_id}")
+def delete_report(report_id: str):
+    conn = get_db()
+    row = conn.execute("SELECT content_path FROM reports WHERE id = ?", (report_id,)).fetchone()
+    if row and row["content_path"] and os.path.exists(row["content_path"]):
+        os.remove(row["content_path"])
+    conn.execute("DELETE FROM reports WHERE id = ?", (report_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+@app.get("/api/reports/{report_id}/export")
+def export_report(report_id: str, format: str = "md"):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM reports WHERE id = ?", (report_id,)).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(404, "Report not found")
+    d = dict(row)
+    content_path = d.get("content_path", "")
+    content = ""
+    if content_path and os.path.exists(content_path):
+        with open(content_path, "r", encoding="utf-8") as f:
+            content = f.read()
+    conn.close()
+    if format == "md":
+        return Response(content=content, media_type="text/markdown",
+                       headers={"Content-Disposition": f'attachment; filename="{d["title"]}.md"'})
+    elif format == "pdf":
+        import subprocess, tempfile
+        # Write md to temp, convert with nano-pdf
+        with tempfile.NamedTemporaryFile(suffix=".md", mode="w", delete=False) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+        pdf_path = tmp_path.replace(".md", ".pdf")
+        try:
+            nano_pdf = os.path.expanduser("~/.local/bin/nano-pdf")
+            if os.path.exists(nano_pdf):
+                subprocess.run([nano_pdf, tmp_path, pdf_path], timeout=30, check=True)
+            else:
+                # Fallback: just return the markdown
+                os.unlink(tmp_path)
+                raise HTTPException(501, "PDF converter not available")
+            with open(pdf_path, "rb") as f:
+                pdf_bytes = f.read()
+            os.unlink(tmp_path)
+            os.unlink(pdf_path)
+            return Response(content=pdf_bytes, media_type="application/pdf",
+                           headers={"Content-Disposition": f'attachment; filename="{d["title"]}.pdf"'})
+        except subprocess.SubprocessError:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            raise HTTPException(500, "PDF generation failed")
+    raise HTTPException(400, "Invalid format. Use 'md' or 'pdf'.")
+
+# Serve report images
+@app.get("/reports/images/{filename}")
+def serve_report_image(filename: str):
+    fpath = os.path.join(REPORTS_IMAGES_DIR, filename)
+    if not os.path.exists(fpath):
+        raise HTTPException(404, "Image not found")
+    return FileResponse(fpath)
 
 # ── No-cache middleware for static assets ───────────────────────
 class NoCacheStaticMiddleware(BaseHTTPMiddleware):

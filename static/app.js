@@ -146,12 +146,12 @@ const PATH_TO_PAGE = {
   '/org-chart': 'orgchart', '/orgchart': 'orgchart',
   '/scheduled-tasks': 'scheduled', '/scheduled': 'scheduled',
   '/workspaces': 'workspaces', '/standups': 'standups',
-  '/actions': 'actions', '/docs': 'docs', '/voice': 'voice',
+  '/actions': 'actions', '/docs': 'docs', '/reports': 'reports', '/voice': 'voice',
 };
 const PAGE_TO_PATH = {
   'dashboard': '/', 'taskmanager': '/task-manager', 'orgchart': '/org-chart',
   'scheduled': '/scheduled-tasks', 'workspaces': '/workspaces', 'standups': '/standups',
-  'actions': '/actions', 'docs': '/docs', 'voice': '/voice',
+  'actions': '/actions', 'docs': '/docs', 'reports': '/reports', 'voice': '/voice',
 };
 
 function navigateTo(page, pushState = true) {
@@ -169,6 +169,7 @@ function navigateTo(page, pushState = true) {
   if (page === 'standups') loadStandups();
   if (page === 'actions') loadActionItems();
   if (page === 'docs') loadDocs();
+  if (page === 'reports') loadReports();
 }
 
 window.addEventListener('popstate', (e) => {
@@ -1578,6 +1579,170 @@ function openSubagentPanel(agentName, evt) {
   document.getElementById('subagentModal').classList.add('open');
 }
 
+// ══════════════════════════════════════════════════════════════
+// REPORTS
+// ══════════════════════════════════════════════════════════════
+
+let reportsCache = [];
+let reportsTags = [];
+let reportsAuthors = [];
+
+async function loadReports() {
+  try {
+    const [reportsRes, tagsRes, authorsRes] = await Promise.all([
+      fetch(`${API}/api/reports`),
+      fetch(`${API}/api/reports/tags`),
+      fetch(`${API}/api/reports/authors`)
+    ]);
+    reportsCache = await reportsRes.json();
+    reportsTags = await tagsRes.json();
+    reportsAuthors = await authorsRes.json();
+    // Populate filter dropdowns
+    const tagSel = document.getElementById('reportTagFilter');
+    tagSel.innerHTML = '<option value="">All Tags</option>' + reportsTags.map(t => `<option value="${t}">${t}</option>`).join('');
+    const authSel = document.getElementById('reportAuthorFilter');
+    authSel.innerHTML = '<option value="">All Authors</option>' + reportsAuthors.map(a => `<option value="${a}">${a}</option>`).join('');
+    renderReportsList(reportsCache);
+  } catch(e) { console.error('Failed to load reports', e); }
+}
+
+function filterReports() {
+  const q = document.getElementById('reportSearchBox').value.trim().toLowerCase();
+  const tag = document.getElementById('reportTagFilter').value;
+  const author = document.getElementById('reportAuthorFilter').value;
+  const dateFrom = document.getElementById('reportDateFrom').value;
+  const dateTo = document.getElementById('reportDateTo').value;
+  const sort = document.getElementById('reportSortBy').value;
+  let filtered = reportsCache.filter(r => {
+    if (q && !r.title.toLowerCase().includes(q) && !r.author.toLowerCase().includes(q) && !r.tags.some(t => t.toLowerCase().includes(q))) return false;
+    if (tag && !r.tags.includes(tag)) return false;
+    if (author && r.author !== author) return false;
+    if (dateFrom && r.date < dateFrom) return false;
+    if (dateTo && r.date > dateTo) return false;
+    return true;
+  });
+  if (sort === 'title') filtered.sort((a, b) => a.title.localeCompare(b.title));
+  else filtered.sort((a, b) => b.date.localeCompare(a.date));
+  renderReportsList(filtered);
+}
+
+function renderReportsList(reports) {
+  const el = document.getElementById('reportsList');
+  const detail = document.getElementById('reportDetail');
+  detail.style.display = 'none';
+  el.style.display = 'block';
+  document.getElementById('reportsFilterBar').style.display = 'flex';
+  if (!reports.length) {
+    el.innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px">No reports found.</p>';
+    return;
+  }
+  el.innerHTML = '<div class="reports-grid">' + reports.map(r => {
+    const sourceIcon = r.source_type === 'youtube' ? '🎬' : r.source_type === 'article' ? '📄' : '✏️';
+    const tagPills = (r.tags || []).map(t => `<span class="report-tag-pill">${esc(t)}</span>`).join('');
+    return `<div class="report-card" onclick="openReport('${r.id}')">
+      <div class="report-card-header">
+        <span class="report-source-icon">${sourceIcon}</span>
+        <span class="report-card-date">${r.date}</span>
+      </div>
+      <div class="report-card-title">${esc(r.title)}</div>
+      <div class="report-card-author">${esc(r.author || 'Unknown')}</div>
+      <div class="report-card-tags">${tagPills}</div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+async function openReport(id) {
+  try {
+    const res = await fetch(`${API}/api/reports/${id}`);
+    const r = await res.json();
+    document.getElementById('reportsList').style.display = 'none';
+    document.getElementById('reportsFilterBar').style.display = 'none';
+    const detail = document.getElementById('reportDetail');
+    detail.style.display = 'block';
+    const sourceIcon = r.source_type === 'youtube' ? '🎬' : r.source_type === 'article' ? '📄' : '✏️';
+    const tagPills = (r.tags || []).map(t => `<span class="report-tag-pill">${esc(t)}</span>`).join('');
+    const screenshots = (r.screenshots || []).map(s => `<div class="report-screenshot"><img src="${esc(s)}" alt="Screenshot" loading="lazy" onclick="openLightbox('${esc(s)}')"></div>`).join('');
+    const sourceLink = r.source_url ? `<a href="${esc(r.source_url)}" target="_blank" rel="noopener">${esc(r.source_url)}</a>` : '—';
+    detail.innerHTML = `
+      <span class="standup-back" onclick="loadReports()">← Back to Reports</span>
+      <div class="report-detail-layout">
+        <div class="report-detail-main">
+          <h2 style="margin:12px 0 16px;font-size:1.3rem">${esc(r.title)}</h2>
+          <div class="doc-content">${renderDocMarkdown(r.content || '')}</div>
+          ${screenshots ? `<div class="report-screenshots"><h3 style="font-size:.85rem;color:var(--muted);margin:20px 0 10px">📷 Screenshots</h3><div class="report-screenshots-grid">${screenshots}</div></div>` : ''}
+        </div>
+        <aside class="report-detail-sidebar">
+          <div class="report-meta-block">
+            <div class="report-meta-row"><span class="report-meta-label">Date</span><span>${esc(r.date)}</span></div>
+            <div class="report-meta-row"><span class="report-meta-label">Author</span><span>${esc(r.author || 'Unknown')}</span></div>
+            <div class="report-meta-row"><span class="report-meta-label">Source</span><span>${sourceIcon} ${esc(r.source_type)}</span></div>
+            <div class="report-meta-row"><span class="report-meta-label">URL</span><span style="font-size:.75rem;word-break:break-all">${sourceLink}</span></div>
+            <div class="report-meta-row"><span class="report-meta-label">Tags</span><div class="report-card-tags">${tagPills}</div></div>
+          </div>
+          <div class="report-actions">
+            <a class="btn btn-sm" href="${API}/api/reports/${r.id}/export?format=md" download>📄 Export MD</a>
+            <a class="btn btn-sm" href="${API}/api/reports/${r.id}/export?format=pdf" download>📑 Export PDF</a>
+            <button class="btn btn-sm" onclick="editReport('${r.id}')">✏️ Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteReport('${r.id}')">🗑️ Delete</button>
+          </div>
+        </aside>
+      </div>`;
+  } catch(e) { console.error(e); }
+}
+
+function openReportCreateModal() {
+  document.getElementById('reportEditId').value = '';
+  document.getElementById('reportModalTitle').textContent = 'New Report';
+  document.getElementById('reportTitle').value = '';
+  document.getElementById('reportAuthor').value = '';
+  document.getElementById('reportSourceUrl').value = '';
+  document.getElementById('reportSourceType').value = 'manual';
+  document.getElementById('reportTags').value = '';
+  document.getElementById('reportContent').value = '';
+  document.getElementById('reportScreenshots').value = '';
+  document.getElementById('reportModal').classList.add('open');
+}
+
+async function editReport(id) {
+  const res = await fetch(`${API}/api/reports/${id}`);
+  const r = await res.json();
+  document.getElementById('reportEditId').value = r.id;
+  document.getElementById('reportModalTitle').textContent = 'Edit Report';
+  document.getElementById('reportTitle').value = r.title;
+  document.getElementById('reportAuthor').value = r.author;
+  document.getElementById('reportSourceUrl').value = r.source_url;
+  document.getElementById('reportSourceType').value = r.source_type;
+  document.getElementById('reportTags').value = (r.tags || []).join(', ');
+  document.getElementById('reportContent').value = r.content || '';
+  document.getElementById('reportScreenshots').value = (r.screenshots || []).join('\n');
+  document.getElementById('reportModal').classList.add('open');
+}
+
+async function submitReport(e) {
+  e.preventDefault();
+  const editId = document.getElementById('reportEditId').value;
+  const data = {
+    title: document.getElementById('reportTitle').value,
+    author: document.getElementById('reportAuthor').value,
+    source_url: document.getElementById('reportSourceUrl').value,
+    source_type: document.getElementById('reportSourceType').value,
+    tags: document.getElementById('reportTags').value.split(',').map(t => t.trim()).filter(Boolean),
+    content: document.getElementById('reportContent').value,
+    screenshots: document.getElementById('reportScreenshots').value.split('\n').map(s => s.trim()).filter(Boolean),
+  };
+  const url = editId ? `${API}/api/reports/${editId}` : `${API}/api/reports`;
+  const method = editId ? 'PUT' : 'POST';
+  await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+  document.getElementById('reportModal').classList.remove('open');
+  loadReports();
+}
+
+async function deleteReport(id) {
+  if (!confirm('Delete this report?')) return;
+  await fetch(`${API}/api/reports/${id}`, { method: 'DELETE' });
+  loadReports();
+}
+
 // ── Helpers ────────────────────────────────────────────────────
 // ── Keyboard Shortcuts ──────────────────────────────────────
 document.addEventListener('keydown', e => {
@@ -1591,7 +1756,7 @@ document.addEventListener('keydown', e => {
     return;
   }
   // Number keys 1-9 navigate to pages
-  const pages = ['dashboard','taskmanager','orgchart','scheduled','workspaces','standups','actions','docs','voice'];
+  const pages = ['dashboard','taskmanager','orgchart','scheduled','workspaces','standups','actions','docs','reports','voice'];
   const num = parseInt(e.key);
   if (num >= 1 && num <= 9 && !e.ctrlKey && !e.metaKey && !e.altKey) {
     const page = pages[num - 1];

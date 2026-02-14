@@ -4,5 +4,6 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ ./backend/
 COPY static/ ./static/
+COPY reports/ ./reports/
 EXPOSE 3335
 CMD ["python", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "3335"]
