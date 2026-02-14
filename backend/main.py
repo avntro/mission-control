@@ -1293,6 +1293,8 @@ def get_agent_stats():
             "total_cost": stats["total_cost"],
             "session_count": len(stats["sessions"]),
             "active_sessions": len([s for s in stats["sessions"] if s["active"]]),
+            "subagent_count": len([s for s in stats["sessions"] if ":subagent:" in s["key"]]),
+            "active_subagents": len([s for s in stats["sessions"] if ":subagent:" in s["key"] and s["active"]]),
         })
     return result
 

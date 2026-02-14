@@ -275,7 +275,9 @@ function renderAgents() {
     const agentLiveTask = liveTasks.find(lt => lt.assigned_agent === a.name && lt.status === 'in_progress');
     const liveCreatedAt = agentLiveTask ? agentLiveTask.created_at : '';
     const liveDur = liveCreatedAt ? formatDuration((Date.now() - new Date(liveCreatedAt).getTime()) / 1000) : '';
-    return { name: a.name, emoji: a.emoji, displayName: a.display_name, statusLabel, statusClass, tokenStr, ctxPct, ctxBarColor, costStr, modelStr, lastAct, lastActivity: a.last_activity || '', liveCreatedAt, liveDur, sessCount };
+    const subagentCount = stats ? stats.subagent_count : 0;
+    const activeSubagents = stats ? stats.active_subagents : 0;
+    return { name: a.name, emoji: a.emoji, displayName: a.display_name, statusLabel, statusClass, tokenStr, ctxPct, ctxBarColor, costStr, modelStr, lastAct, lastActivity: a.last_activity || '', liveCreatedAt, liveDur, sessCount, subagentCount, activeSubagents };
   });
   // Check if agent list structure changed
   const cards = el.querySelectorAll('.agent-card[data-agent]');
@@ -289,6 +291,7 @@ function renderAgents() {
       <div class="agent-ctx-bar"><div class="agent-ctx-fill" style="width:${Math.min(d.ctxPct,100)}%;background:${d.ctxBarColor}"></div></div>
       <div class="agent-meta-model">🧠 ${esc(d.modelStr)}</div>
       ${d.liveCreatedAt ? `<div class="agent-meta"><span data-created-at="${d.liveCreatedAt}" data-tick-duration>⏱ ${d.liveDur}</span><span>📊 ${d.sessCount} sessions</span></div>` : ''}
+      ${d.subagentCount > 0 ? `<div class="agent-meta agent-subagent-row"><span>🔀 ${d.activeSubagents > 0 ? d.activeSubagents + ' active / ' : ''}${d.subagentCount} sub-agents</span></div>` : ''}
       <div class="agent-meta"><span>💰 ${d.costStr}</span><span ${d.lastActivity ? `data-time-ago="${d.lastActivity}" data-time-prefix="🕐 "` : ''}>🕐 ${d.lastAct}</span></div>
     </div>`).join('');
     return;
@@ -573,6 +576,10 @@ async function loadTaskManager() {
   document.getElementById('stat-idle').textContent = idleCount;
   document.getElementById('stat-busy').textContent = activeCount;
   document.getElementById('stat-error').textContent = error;
+  const totalSubagents = agentStats.reduce((sum, s) => sum + (s.subagent_count || 0), 0);
+  const activeSubagentsTotal = agentStats.reduce((sum, s) => sum + (s.active_subagents || 0), 0);
+  const subEl = document.getElementById('stat-subagents');
+  if (subEl) subEl.textContent = activeSubagentsTotal > 0 ? `${activeSubagentsTotal}/${totalSubagents}` : totalSubagents;
   const row = document.getElementById('agentCardsRow');
   row.innerHTML = agents.map(a => {
     const stats = agentStats.find(s => s.name === a.name);
@@ -588,7 +595,8 @@ async function loadTaskManager() {
     return `<div class="agent-card-lg"><div class="agent-card-lg-top"><div class="agent-avatar">${a.emoji}</div><div class="agent-card-lg-info"><h3>${esc(a.display_name)}</h3><div class="model-tag">${esc(stats?.model || a.model)}</div></div><span class="agent-status-pill" style="${sc}">${statusLabel}</span></div>
     <div class="agent-ctx-row"><span>Context: ${tokenStr}</span><span style="color:${ctxColor}">${ctxPct}%</span></div>
     <div class="agent-ctx-bar-lg"><div class="agent-ctx-fill" style="width:${Math.min(ctxPct,100)}%;background:${ctxColor}"></div></div>
-    <div class="agent-card-lg-stats"><div class="agent-stat"><span class="num">${sessCount}</span><span class="lbl">Sessions</span></div><div class="agent-stat"><span class="num">${activeSess}</span><span class="lbl">Active</span></div><div class="agent-stat"><span class="num">${costStr}</span><span class="lbl">Cost</span></div></div></div>`;
+    <div class="agent-card-lg-stats"><div class="agent-stat"><span class="num">${sessCount}</span><span class="lbl">Sessions</span></div><div class="agent-stat"><span class="num">${activeSess}</span><span class="lbl">Active</span></div><div class="agent-stat"><span class="num">${costStr}</span><span class="lbl">Cost</span></div></div>
+    ${stats && stats.subagent_count > 0 ? `<div class="agent-subagent-badge">🔀 ${stats.active_subagents > 0 ? stats.active_subagents + ' active / ' : ''}${stats.subagent_count} sub-agents</div>` : ''}</div>`;
   }).join('');
 }
 
@@ -614,20 +622,25 @@ function renderOrgChart() {
   const getStatus = (name) => { const a = agents.find(a => a.name === name); return a ? a.status : 'idle'; };
   const statusDot = (s) => { const color = s === 'busy' ? '#ffab40' : s === 'error' ? '#ff5252' : '#00E676'; return `<span class="dot" style="background:${color};box-shadow:0 0 6px ${color}"></span>`; };
   // Dynamic: derive child agents from live agents data (exclude 'main' which is Mike/COO)
-  const childAgents = agents.filter(a => a.name !== 'main').map(a => ({
-    id: a.name,
-    name: a.display_name || a.name,
-    role: a.current_task || '',
-    emoji: a.emoji || '🤖',
-    model: a.model || 'unknown',
-  }));
+  const childAgents = agents.filter(a => a.name !== 'main').map(a => {
+    const st = agentStats.find(s => s.name === a.name);
+    return {
+      id: a.name,
+      name: a.display_name || a.name,
+      role: a.current_task || '',
+      emoji: a.emoji || '🤖',
+      model: a.model || 'unknown',
+      subagentCount: st ? st.subagent_count : 0,
+      activeSubagents: st ? st.active_subagents : 0,
+    };
+  });
   const collapsed = orgExpanded ? '' : 'collapsed';
   tree.innerHTML = `
     <div class="org-level"><div class="org-node" onclick="toggleOrgChildren('mike-children')"><div class="org-node-avatar">👤</div><div class="org-node-name">Argyris</div><div class="org-node-role">Owner · CEO · Vision & Strategy</div><div class="org-node-status">${statusDot('idle')} <span style="color:var(--green)">Online</span></div></div></div>
     <div style="display:flex;justify-content:center"><div style="width:2px;height:30px;background:var(--border-hover)"></div></div>
-    <div class="org-level"><div class="org-node" onclick="toggleOrgChildren('agent-children')"><div class="org-node-avatar">🎯</div><div class="org-node-name">Mike</div><div class="org-node-role">COO · Facilitator · Task Delegation</div><div class="org-node-model">anthropic/claude-opus-4-6</div><div class="org-node-status">${statusDot(getStatus('main'))} <span>${getStatus('main')}</span></div></div></div>
+    <div class="org-level"><div class="org-node" onclick="toggleOrgChildren('agent-children')"><div class="org-node-avatar">🎯</div><div class="org-node-name">Mike</div><div class="org-node-role">COO · Facilitator · Task Delegation</div><div class="org-node-model">anthropic/claude-opus-4-6</div>${(() => { const ms = agentStats.find(s => s.name === 'main'); return ms && ms.subagent_count > 0 ? `<div class="org-node-subagents">🔀 ${ms.active_subagents > 0 ? ms.active_subagents + ' active / ' : ''}${ms.subagent_count} sub-agents</div>` : ''; })()}<div class="org-node-status">${statusDot(getStatus('main'))} <span>${getStatus('main')}</span></div></div></div>
     <div style="display:flex;justify-content:center"><div style="width:2px;height:30px;background:var(--border-hover)"></div></div>
-    <div class="org-children ${collapsed}" id="agent-children">${childAgents.map(a => `<div class="org-connector"><div class="org-node"><div class="org-node-avatar">${a.emoji}</div><div class="org-node-name">${a.name}</div><div class="org-node-role">${a.role}</div><div class="org-node-model">${a.model}</div><div class="org-node-status">${statusDot(getStatus(a.id))} <span>${getStatus(a.id)}</span></div></div></div>`).join('')}</div>`;
+    <div class="org-children ${collapsed}" id="agent-children">${childAgents.map(a => `<div class="org-connector"><div class="org-node"><div class="org-node-avatar">${a.emoji}</div><div class="org-node-name">${a.name}</div><div class="org-node-role">${a.role}</div><div class="org-node-model">${a.model}</div>${a.subagentCount > 0 ? `<div class="org-node-subagents">🔀 ${a.activeSubagents > 0 ? a.activeSubagents + ' active / ' : ''}${a.subagentCount} sub-agents</div>` : ''}<div class="org-node-status">${statusDot(getStatus(a.id))} <span>${getStatus(a.id)}</span></div></div></div>`).join('')}</div>`;
 }
 
 function toggleOrgChildren(id) { const el = document.getElementById(id); if (el) el.classList.toggle('collapsed'); }

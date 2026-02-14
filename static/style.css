@@ -476,3 +476,9 @@ body{
 .lightbox-content img{max-width:92vw;max-height:88vh;object-fit:contain;border-radius:8px;box-shadow:0 0 60px rgba(0,188,212,.15)}
 .lightbox-close{position:absolute;top:-12px;right:-12px;width:32px;height:32px;border-radius:50%;border:none;background:var(--card);color:var(--text);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.4)}
 .lightbox-close:hover{background:var(--red);color:#fff}
+
+/* Sub-agent badges */
+.agent-subagent-row{color:#e040fb !important}
+.agent-subagent-row span{color:#e040fb;font-size:.75rem}
+.agent-subagent-badge{margin-top:8px;padding:4px 10px;background:rgba(224,64,251,.1);border:1px solid rgba(224,64,251,.25);border-radius:6px;color:#e040fb;font-size:.75rem;text-align:center}
+.org-node-subagents{font-size:.72rem;color:#e040fb;margin-top:2px}
