@@ -250,7 +250,7 @@ function renderAgents() {
       <div class="agent-token-row"><span class="agent-token-label">Context</span><span class="agent-token-value">${d.tokenStr}</span></div>
       <div class="agent-ctx-bar"><div class="agent-ctx-fill" style="width:${Math.min(d.ctxPct,100)}%;background:${d.ctxBarColor}"></div></div>
       <div class="agent-meta-model">🧠 ${esc(d.modelStr)}</div>
-      <div class="agent-meta"><span>💰 ${d.costStr}</span><span ${d.lastActivity ? `data-time-ago="${d.lastActivity}"` : ''}>🕐 ${d.lastAct}</span></div>
+      <div class="agent-meta"><span>💰 ${d.costStr}</span><span ${d.lastActivity ? `data-time-ago="${d.lastActivity}" data-time-prefix="🕐 "` : ''}>🕐 ${d.lastAct}</span></div>
     </div>`).join('');
     return;
   }
@@ -268,7 +268,7 @@ function renderAgents() {
     const costEl = card.querySelector('.agent-meta > span:first-child');
     if (costEl) costEl.textContent = '💰 ' + d.costStr;
     const timeEl = card.querySelector('.agent-meta > span:last-child');
-    if (timeEl && d.lastActivity) { timeEl.dataset.timeAgo = d.lastActivity; }
+    if (timeEl && d.lastActivity) { timeEl.dataset.timeAgo = d.lastActivity; timeEl.dataset.timePrefix = '🕐 '; timeEl.textContent = '🕐 ' + d.lastAct; }
   });
 }
 
