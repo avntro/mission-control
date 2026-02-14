@@ -438,3 +438,5 @@ body{
 .job-onetime-badge{font-size:.55rem;font-weight:700;color:var(--orange);background:rgba(255,171,64,.15);padding:1px 5px;border-radius:3px;margin-left:6px;vertical-align:middle}
 .log-entry-icon{margin-right:6px}
 .log-fail-badge{font-size:.55rem;font-weight:700;color:var(--red);background:rgba(255,82,82,.15);padding:1px 5px;border-radius:3px;margin-left:6px}
+
+.live-source-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:8px;font-size:.78rem;font-weight:600;background:rgba(0,188,212,0.1);color:var(--accent);border:1px solid rgba(0,188,212,0.2)}

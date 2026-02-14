@@ -395,8 +395,24 @@ function openLiveDetail(id) {
   const t = liveTasks.find(lt => lt.id === id);
   if (!t) return;
   document.getElementById('detailTitle').textContent = t.title;
-  let html = buildPremiumModal(t, true);
+
+  // Source badge row (matches DB task action buttons row position)
+  const sourceIcon = t.source === 'cron' ? '⏰' : t.source === 'subagent' ? '🔀' : '🎮';
+  const sourceLabel = t.source === 'cron' ? 'Cron Job' : t.source === 'subagent' ? 'Sub-agent' : 'Interactive';
+  let html = `<div class="premium-actions"><span class="live-source-badge">${sourceIcon} ${sourceLabel}</span><span class="live-source-badge" style="margin-left:auto;font-family:'SF Mono',Consolas,monospace;font-size:.7rem;opacity:.7">${esc(t.session_key || t.id)}</span></div>`;
+
+  html += buildPremiumModal(t, true);
+
   if (t.description) html += `<div class="detail-section" style="margin-top:20px"><h3>Description</h3><div class="detail-desc">${esc(t.description)}</div></div>`;
+
+  // Live task info section (since live tasks don't have comments/history)
+  html += `<div class="detail-section" style="margin-top:20px"><h3>Live Session Info</h3><div style="font-size:.83rem;color:var(--muted);line-height:1.6">
+    <div>📡 <strong>Source:</strong> ${sourceLabel}</div>
+    <div>🔑 <strong>Session:</strong> <code style="font-size:.75rem">${esc(t.session_key || '')}</code></div>
+    ${t.updated_at ? `<div>🔄 <strong>Last Update:</strong> <span data-time-ago="${t.updated_at}">${timeAgo(t.updated_at)}</span></div>` : ''}
+    ${t.priority ? `<div>📊 <strong>Priority:</strong> ${t.priority}</div>` : ''}
+  </div></div>`;
+
   document.getElementById('detailBody').innerHTML = html;
   document.getElementById('detailModal').classList.add('open');
 }
