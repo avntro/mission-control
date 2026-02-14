@@ -50,6 +50,7 @@ function tickTimers() {
 
 async function loadAll() {
   await Promise.all([loadTasks(), loadAgents(), loadAgentStats(), loadLiveTasks()]);
+  if (currentPage === 'dashboard') renderBoard();
 }
 
 async function loadAgentStats() {
@@ -65,7 +66,7 @@ async function loadAgentStats() {
 }
 
 async function loadLiveTasks() {
-  try { const res = await fetch(`${API}/api/live-tasks`); liveTasks = await res.json(); if (currentPage === 'dashboard') renderBoard(); } catch(e) { console.error('Failed to load live tasks', e); }
+  try { const res = await fetch(`${API}/api/live-tasks`); liveTasks = await res.json(); } catch(e) { console.error('Failed to load live tasks', e); }
 }
 
 // ── Navigation ─────────────────────────────────────────────────
@@ -119,7 +120,7 @@ async function loadTasks() {
   try {
     const res = await fetch(`${API}/api/tasks`);
     tasks = await res.json();
-    if (currentPage === 'dashboard') renderBoard();
+    // Board rendering is triggered by loadAll after all data is loaded
   } catch(e) { console.error('Failed to load tasks', e); }
 }
 
@@ -237,7 +238,11 @@ function renderAgents() {
     const modelStr = (stats && stats.model) ? stats.model.replace('anthropic/', '') : (a.model ? a.model.replace('anthropic/', '') : '—');
     const sessCount = stats ? stats.active_sessions : 0;
     const lastAct = a.last_activity ? timeAgo(a.last_activity) : 'No activity';
-    return { name: a.name, emoji: a.emoji, displayName: a.display_name, statusLabel, statusClass, tokenStr, ctxPct, ctxBarColor, costStr, modelStr, lastAct, lastActivity: a.last_activity || '' };
+    // Find active live task for this agent to show duration
+    const agentLiveTask = liveTasks.find(lt => lt.assigned_agent === a.name && lt.status === 'in_progress');
+    const liveCreatedAt = agentLiveTask ? agentLiveTask.created_at : '';
+    const liveDur = liveCreatedAt ? formatDuration((Date.now() - new Date(liveCreatedAt).getTime()) / 1000) : '';
+    return { name: a.name, emoji: a.emoji, displayName: a.display_name, statusLabel, statusClass, tokenStr, ctxPct, ctxBarColor, costStr, modelStr, lastAct, lastActivity: a.last_activity || '', liveCreatedAt, liveDur, sessCount };
   });
   // Check if agent list structure changed
   const cards = el.querySelectorAll('.agent-card[data-agent]');
@@ -250,6 +255,7 @@ function renderAgents() {
       <div class="agent-token-row"><span class="agent-token-label">Context</span><span class="agent-token-value">${d.tokenStr}</span></div>
       <div class="agent-ctx-bar"><div class="agent-ctx-fill" style="width:${Math.min(d.ctxPct,100)}%;background:${d.ctxBarColor}"></div></div>
       <div class="agent-meta-model">🧠 ${esc(d.modelStr)}</div>
+      ${d.liveCreatedAt ? `<div class="agent-meta"><span data-created-at="${d.liveCreatedAt}" data-tick-duration>⏱ ${d.liveDur}</span><span>📊 ${d.sessCount} sessions</span></div>` : ''}
       <div class="agent-meta"><span>💰 ${d.costStr}</span><span ${d.lastActivity ? `data-time-ago="${d.lastActivity}" data-time-prefix="🕐 "` : ''}>🕐 ${d.lastAct}</span></div>
     </div>`).join('');
     return;
@@ -265,10 +271,15 @@ function renderAgents() {
     if (ctxFill) { ctxFill.style.width = Math.min(d.ctxPct, 100) + '%'; ctxFill.style.background = d.ctxBarColor; }
     const modelEl = card.querySelector('.agent-meta-model');
     if (modelEl) modelEl.textContent = '🧠 ' + d.modelStr;
-    const costEl = card.querySelector('.agent-meta > span:first-child');
-    if (costEl) costEl.textContent = '💰 ' + d.costStr;
-    const timeEl = card.querySelector('.agent-meta > span:last-child');
-    if (timeEl && d.lastActivity) { timeEl.dataset.timeAgo = d.lastActivity; timeEl.dataset.timePrefix = '🕐 '; timeEl.textContent = '🕐 ' + d.lastAct; }
+    const metaDivs = card.querySelectorAll('.agent-meta');
+    // Last meta div has cost + time
+    const lastMeta = metaDivs[metaDivs.length - 1];
+    if (lastMeta) {
+      const costEl = lastMeta.querySelector('span:first-child');
+      if (costEl) costEl.textContent = '💰 ' + d.costStr;
+      const timeEl = lastMeta.querySelector('span:last-child');
+      if (timeEl && d.lastActivity) { timeEl.dataset.timeAgo = d.lastActivity; timeEl.dataset.timePrefix = '🕐 '; timeEl.textContent = '🕐 ' + d.lastAct; }
+    }
   });
 }
 
@@ -313,12 +324,13 @@ function buildPremiumModal(t, isLive) {
   const agentName = agentFromDB ? agentFromDB.display_name : info.name;
   const agentEmoji = agentFromDB ? agentFromDB.emoji : info.emoji;
   const agentColor = info.color || 'var(--accent)';
+  const agentRole = t.assigned_agent ? t.assigned_agent.replace('-',' ').toUpperCase() : 'UNASSIGNED';
 
   const isDone = t.status === 'done' || t.status === 'review';
   const isActive = t.status === 'in_progress';
   const statusBadge = isActive
-    ? `<span class="premium-status-badge live">🔄 LIVE</span>`
-    : `<span class="premium-status-badge completed">✅ ${(t.status || 'done').replace('_',' ').toUpperCase()}</span>`;
+    ? `<div class="premium-status-badge live">🔄 LIVE</div>`
+    : `<div class="premium-status-badge completed">✅ ${(t.status || 'done').replace('_',' ').toUpperCase()}</div>`;
 
   // Duration
   let dur = '—';
@@ -331,24 +343,27 @@ function buildPremiumModal(t, isLive) {
 
   const modelStr = t.model || '—';
   const costStr = t.cost != null && t.cost > 0 ? `$${t.cost.toFixed(2)}` : '—';
-  const tokens = t.tokens ? formatTokens(t.tokens) + ' tokens' : '—';
+  const tokens = t.tokens ? formatTokens(t.tokens) : '—';
   const startTime = t.created_at ? new Date(t.created_at).toLocaleString() : '—';
-  const startAgo = t.created_at ? timeAgo(t.created_at) : '';
+  const startAgo = t.created_at ? timeAgo(t.created_at) : '—';
 
-  let html = statusBadge;
+  let html = '';
 
-  // Agent row
+  // Status badge
+  html += statusBadge;
+
+  // Agent block
   html += `<div class="premium-agent">
     <div class="premium-agent-icon" style="background:${agentColor}22;border:1px solid ${agentColor}44">${agentEmoji}</div>
-    <div><div class="premium-agent-name">${esc(agentName)}</div><div class="premium-agent-role">${esc(t.assigned_agent || 'unassigned')}</div></div>
+    <div><div class="premium-agent-name">${esc(agentName)}</div><div class="premium-agent-role">${agentRole}</div></div>
   </div>`;
 
-  // Stats grid
+  // 6-cell stats grid (2×3)
   html += `<div class="premium-grid">
     <div class="premium-stat"><div class="stat-icon">⏱</div><div class="stat-label">Duration</div><div class="stat-value">${dur}</div></div>
-    <div class="premium-stat"><div class="stat-icon">🪙</div><div class="stat-label">Tokens</div><div class="stat-value">${tokens}</div></div>
-    <div class="premium-stat"><div class="stat-icon">💰</div><div class="stat-label">Est. Cost</div><div class="stat-value">${costStr}</div></div>
-    <div class="premium-stat"><div class="stat-icon">🤖</div><div class="stat-label">Model</div><div class="stat-value" style="font-size:.76rem">${esc(modelStr)}</div></div>
+    <div class="premium-stat"><div class="stat-icon">🟡</div><div class="stat-label">Tokens</div><div class="stat-value">${tokens}</div></div>
+    <div class="premium-stat"><div class="stat-icon">🔥</div><div class="stat-label">Est. Cost</div><div class="stat-value">${costStr}</div></div>
+    <div class="premium-stat"><div class="stat-icon">🖥️</div><div class="stat-label">Model</div><div class="stat-value" style="font-size:.76rem">${esc(modelStr)}</div></div>
     <div class="premium-stat"><div class="stat-icon">📅</div><div class="stat-label">Started</div><div class="stat-value" style="font-size:.76rem">${startTime}</div></div>
     <div class="premium-stat"><div class="stat-icon">🕐</div><div class="stat-label">Ago</div><div class="stat-value" data-time-ago="${t.created_at || ''}" data-time-prefix="">${startAgo}</div></div>
   </div>`;
@@ -367,23 +382,41 @@ async function openDetail(id) {
     const t = await res.json();
     document.getElementById('detailTitle').textContent = t.title;
 
-    let html = `<div class="premium-actions">${['todo','in_progress','review','done'].map(s => `<button class="btn btn-sm ${t.status===s?'btn-primary':''}" onclick="moveTask('${t.id}','${s}')">${s.replace('_',' ')}</button>`).join('')}<button class="btn btn-sm btn-danger" onclick="deleteTask('${t.id}')">🗑</button></div>`;
+    // 1. Status buttons row
+    let html = `<div class="premium-actions">${['todo','in_progress','review','done'].map(s => `<button class="btn btn-sm ${t.status===s?'btn-primary':''}" onclick="moveTask('${t.id}','${s}')">${s.replace('_',' ')}</button>`).join('')}<button class="btn btn-sm btn-danger" onclick="deleteTask('${t.id}')">🗑️</button></div>`;
 
+    // 2-6. Status badge + agent + grid + session
     html += buildPremiumModal(t, false);
 
-    if (t.description) html += `<div class="detail-section" style="margin-top:20px"><h3>Description</h3><div class="detail-desc">${esc(t.description)}</div></div>`;
+    // 7. Description
+    if (t.description) html += `<div class="detail-section"><h3>Description</h3><div class="detail-desc">${esc(t.description)}</div></div>`;
+
+    // Attachments
     html += renderAttachmentsSection(t);
+
+    // 8. Comments & Logs
     if (t.comments && t.comments.length) {
-      html += `<div class="detail-section"><h3>Comments & Logs (${t.comments.length})</h3>`;
-      t.comments.forEach(c => { const cA = agents.find(a => a.name === c.agent); const cN = cA ? cA.display_name : (c.agent || 'System'); html += `<div class="comment-item type-${c.type}"><div class="comment-header"><span><span class="comment-agent">${esc(cN)}</span><span class="comment-type">${c.type}</span></span><span data-time-ago="${c.created_at}">${timeAgo(c.created_at)}</span></div><div class="comment-content">${esc(c.content)}</div></div>`; });
+      html += `<div class="detail-section"><h3>Comments &amp; Logs (${t.comments.length})</h3>`;
+      t.comments.forEach(c => {
+        const cA = agents.find(a => a.name === c.agent);
+        const cN = cA ? cA.display_name : (c.agent || 'System');
+        html += `<div class="comment-item type-${c.type}"><div class="comment-header"><span><span class="comment-agent">${esc(cN)}</span><span class="comment-type">${c.type}</span></span><span data-time-ago="${c.created_at}">${timeAgo(c.created_at)}</span></div><div class="comment-content">${esc(c.content)}</div></div>`;
+      });
       html += '</div>';
     }
+
+    // 9. History
     if (t.history && t.history.length) {
       html += `<div class="detail-section"><h3>History</h3><div class="history-list">`;
-      t.history.forEach(h => { html += `<div class="history-item"><span class="history-time" data-time-ago="${h.created_at}">${timeAgo(h.created_at)}</span><span class="history-action">${h.action.replace(/_/g,' ')}</span><span class="history-detail">— ${esc(h.details || '')}</span></div>`; });
+      t.history.forEach(h => {
+        html += `<div class="history-item"><span class="history-time" data-time-ago="${h.created_at}">${timeAgo(h.created_at)}</span><span class="history-action">${h.action.replace(/_/g,' ')}</span><span class="history-detail">— ${esc(h.details || '')}</span></div>`;
+      });
       html += '</div></div>';
     }
-    html += `<div class="detail-section"><h3>Add Comment</h3><textarea id="commentText" rows="2" placeholder="Add a comment..." style="width:100%;padding:10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--card);color:var(--text);font-family:inherit;font-size:.83rem;margin-bottom:8px"></textarea><button class="btn btn-sm btn-primary" onclick="addComment('${t.id}')">Add Comment</button></div>`;
+
+    // 10. Add Comment
+    html += `<div class="detail-section"><h3>Add Comment</h3><textarea id="commentText" rows="3" placeholder="Add a comment..." style="width:100%;padding:10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--card);color:var(--text);font-family:inherit;font-size:.83rem;margin-bottom:8px"></textarea><button class="btn btn-sm" style="background:var(--red);color:#fff;border-color:var(--red)" onclick="addComment('${t.id}')">Add Comment</button></div>`;
+
     document.getElementById('detailBody').innerHTML = html;
     document.getElementById('detailModal').classList.add('open');
   } catch(e) { console.error(e); }
@@ -458,20 +491,21 @@ function openLiveDetail(id) {
   if (!t) return;
   document.getElementById('detailTitle').textContent = t.title;
 
-  // Source badge row (matches DB task action buttons row position)
+  // Source badge row
   const sourceIcon = t.source === 'cron' ? '⏰' : t.source === 'subagent' ? '🔀' : '🎮';
   const sourceLabel = t.source === 'cron' ? 'Cron Job' : t.source === 'subagent' ? 'Sub-agent' : 'Interactive';
-  let html = `<div class="premium-actions"><span class="live-source-badge">${sourceIcon} ${sourceLabel}</span><span class="live-source-badge" style="margin-left:auto;font-family:'SF Mono',Consolas,monospace;font-size:.7rem;opacity:.7">${esc(t.session_key || t.id)}</span></div>`;
+  let html = `<div class="premium-actions"><span class="live-source-badge">${sourceIcon} ${sourceLabel}</span></div>`;
 
+  // Status badge + agent + grid + session
   html += buildPremiumModal(t, true);
 
-  if (t.description) html += `<div class="detail-section" style="margin-top:20px"><h3>Description</h3><div class="detail-desc">${esc(t.description)}</div></div>`;
+  // Description
+  if (t.description) html += `<div class="detail-section"><h3>Description</h3><div class="detail-desc">${esc(t.description)}</div></div>`;
   html += renderAttachmentsSection(t);
 
-  // Live task info section (since live tasks don't have comments/history)
-  html += `<div class="detail-section" style="margin-top:20px"><h3>Live Session Info</h3><div style="font-size:.83rem;color:var(--muted);line-height:1.6">
+  // Live session info
+  html += `<div class="detail-section"><h3>Live Session Info</h3><div style="font-size:.83rem;color:var(--muted);line-height:1.8">
     <div>📡 <strong>Source:</strong> ${sourceLabel}</div>
-    <div>🔑 <strong>Session:</strong> <code style="font-size:.75rem">${esc(t.session_key || '')}</code></div>
     ${t.updated_at ? `<div>🔄 <strong>Last Update:</strong> <span data-time-ago="${t.updated_at}">${timeAgo(t.updated_at)}</span></div>` : ''}
     ${t.priority ? `<div>📊 <strong>Priority:</strong> ${t.priority}</div>` : ''}
   </div></div>`;
