@@ -777,17 +777,17 @@ function openLiveDetail(id) {
   document.getElementById('detailBody').innerHTML = html;
   document.getElementById('detailModal').classList.add('open');
 }
-async function moveTask(id, status) { await fetch(`${API}/api/tasks/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status}) }); closeDetail(); await loadTasks(); renderBoard(); }
-async function deleteTask(id) { if (!confirm('Delete this task?')) return; await fetch(`${API}/api/tasks/${id}`, { method:'DELETE' }); closeDetail(); await loadTasks(); renderBoard(); }
-async function approveTask(id) { await fetch(`${API}/api/tasks/${id}/approve`, { method:'POST' }); closeDetail(); await loadTasks(); renderBoard(); }
-async function rejectTask(id) { await fetch(`${API}/api/tasks/${id}/reject`, { method:'POST' }); closeDetail(); await loadTasks(); renderBoard(); }
+async function moveTask(id, status) { await fetch(`${API}/api/tasks/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status}) }); closeDetail(); await Promise.all([loadTasks(), loadLiveTasks()]); renderBoard(); }
+async function deleteTask(id) { if (!confirm('Delete this task?')) return; await fetch(`${API}/api/tasks/${id}`, { method:'DELETE' }); closeDetail(); await Promise.all([loadTasks(), loadLiveTasks()]); renderBoard(); }
+async function approveTask(id) { await fetch(`${API}/api/tasks/${id}/approve`, { method:'POST' }); closeDetail(); await Promise.all([loadTasks(), loadLiveTasks()]); renderBoard(); }
+async function rejectTask(id) { await fetch(`${API}/api/tasks/${id}/reject`, { method:'POST' }); closeDetail(); await Promise.all([loadTasks(), loadLiveTasks()]); renderBoard(); }
 async function approveAllReview() {
   const reviewItems = [...tasks.filter(t=>t.status==='review'), ...liveTasks.filter(t=>t.status==='review')];
   if (!reviewItems.length) return;
   if (!confirm(`Approve all ${reviewItems.length} review items?`)) return;
   const btn = document.getElementById('btn-approve-all'); if(btn) btn.textContent = '⏳ Approving...';
   await Promise.all(reviewItems.map(t => fetch(`${API}/api/tasks/${t.id}/approve`, { method:'POST' })));
-  closeDetail(); await loadTasks(); renderBoard();
+  closeDetail(); await Promise.all([loadTasks(), loadLiveTasks()]); renderBoard();
 }
 async function addComment(taskId) { const text = document.getElementById('commentText').value.trim(); if (!text) return; await fetch(`${API}/api/comments`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({task_id:taskId,content:text,agent:'',type:'comment'}) }); openDetail(taskId); }
 
