@@ -265,17 +265,17 @@ function renderOrgChart() {
   const getStatus = (name) => { const a = agents.find(a => a.name === name); return a ? a.status : 'idle'; };
   const statusDot = (s) => { const color = s === 'busy' ? '#ffab40' : s === 'error' ? '#ff5252' : '#00E676'; return `<span class="dot" style="background:${color};box-shadow:0 0 6px ${color}"></span>`; };
   const childAgents = [
-    { id:'trading', name:'Trading / AA', role:'Trading Specialist', emoji:'📈', model:'claude-opus-4-6' },
-    { id:'it-support', name:'IT Support', role:'Infrastructure', emoji:'🔧', model:'claude-sonnet-4-5' },
-    { id:'dev', name:'Dev', role:'Software Development', emoji:'💻', model:'claude-opus-4-6' },
-    { id:'voice', name:'Voice', role:'Voice Assistant', emoji:'🎙️', model:'claude-sonnet-4-5' },
-    { id:'troubleshoot', name:'Troubleshoot', role:'Troubleshooting', emoji:'🔍', model:'claude-sonnet-4-5' },
+    { id:'trading', name:'Trading / AA', role:'Trading Specialist', emoji:'📈', model:'anthropic/claude-opus-4-6' },
+    { id:'it-support', name:'IT Support', role:'Infrastructure', emoji:'🔧', model:'anthropic/claude-sonnet-4-20250514' },
+    { id:'dev', name:'Dev', role:'Software Development', emoji:'💻', model:'anthropic/claude-opus-4-6' },
+    { id:'voice', name:'Voice', role:'Voice Assistant', emoji:'🎙️', model:'anthropic/claude-sonnet-4-20250514' },
+    { id:'troubleshoot', name:'Troubleshoot', role:'Troubleshooting', emoji:'🔍', model:'anthropic/claude-opus-4-6' },
   ];
   const collapsed = orgExpanded ? '' : 'collapsed';
   tree.innerHTML = `
     <div class="org-level"><div class="org-node" onclick="toggleOrgChildren('mike-children')"><div class="org-node-avatar">👤</div><div class="org-node-name">Argyris</div><div class="org-node-role">Owner · CEO · Vision & Strategy</div><div class="org-node-status">${statusDot('idle')} <span style="color:var(--green)">Online</span></div></div></div>
     <div style="display:flex;justify-content:center"><div style="width:2px;height:30px;background:var(--border-hover)"></div></div>
-    <div class="org-level"><div class="org-node" onclick="toggleOrgChildren('agent-children')"><div class="org-node-avatar">🎯</div><div class="org-node-name">Mike</div><div class="org-node-role">COO · Facilitator · Task Delegation</div><div class="org-node-model">claude-opus-4-6</div><div class="org-node-status">${statusDot(getStatus('main'))} <span>${getStatus('main')}</span></div></div></div>
+    <div class="org-level"><div class="org-node" onclick="toggleOrgChildren('agent-children')"><div class="org-node-avatar">🎯</div><div class="org-node-name">Mike</div><div class="org-node-role">COO · Facilitator · Task Delegation</div><div class="org-node-model">anthropic/claude-opus-4-6</div><div class="org-node-status">${statusDot(getStatus('main'))} <span>${getStatus('main')}</span></div></div></div>
     <div style="display:flex;justify-content:center"><div style="width:2px;height:30px;background:var(--border-hover)"></div></div>
     <div class="org-children ${collapsed}" id="agent-children">${childAgents.map(a => `<div class="org-connector"><div class="org-node"><div class="org-node-avatar">${a.emoji}</div><div class="org-node-name">${a.name}</div><div class="org-node-role">${a.role}</div><div class="org-node-model">${a.model}</div><div class="org-node-status">${statusDot(getStatus(a.id))} <span>${getStatus(a.id)}</span></div></div></div>`).join('')}</div>`;
 }

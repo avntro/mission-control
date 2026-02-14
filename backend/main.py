@@ -168,15 +168,26 @@ def init_db():
         agents_data = [
             ("main", "Mike", "anthropic/claude-opus-4-6", "idle", "🎯"),
             ("trading", "Trading / AA", "anthropic/claude-opus-4-6", "idle", "📈"),
-            ("it-support", "IT Support", "anthropic/claude-sonnet-4-5", "idle", "🔧"),
+            ("it-support", "IT Support", "anthropic/claude-sonnet-4-20250514", "idle", "🔧"),
             ("dev", "Dev", "anthropic/claude-opus-4-6", "idle", "💻"),
-            ("voice", "Voice", "anthropic/claude-sonnet-4-5", "idle", "🎙️"),
-            ("troubleshoot", "Troubleshoot", "anthropic/claude-sonnet-4-5", "idle", "🔍"),
+            ("voice", "Voice", "anthropic/claude-sonnet-4-20250514", "idle", "🎙️"),
+            ("troubleshoot", "Troubleshoot", "anthropic/claude-opus-4-6", "idle", "🔍"),
         ]
         conn.executemany(
             "INSERT INTO agents (name, display_name, model, status, emoji) VALUES (?,?,?,?,?)",
             agents_data
         )
+    # Always update model names to correct values (migration)
+    model_corrections = [
+        ("main", "anthropic/claude-opus-4-6"),
+        ("trading", "anthropic/claude-opus-4-6"),
+        ("it-support", "anthropic/claude-sonnet-4-20250514"),
+        ("dev", "anthropic/claude-opus-4-6"),
+        ("voice", "anthropic/claude-sonnet-4-20250514"),
+        ("troubleshoot", "anthropic/claude-opus-4-6"),
+    ]
+    for agent_name, correct_model in model_corrections:
+        conn.execute("UPDATE agents SET model = ? WHERE name = ?", (correct_model, agent_name))
     conn.commit()
     conn.close()
 
@@ -367,11 +378,51 @@ def create_comment(c: CommentCreate):
 
 # ── Agents ──────────────────────────────────────────────────────
 @app.get("/api/agents")
-def list_agents():
+async def list_agents():
     conn = get_db()
     rows = conn.execute("SELECT * FROM agents ORDER BY name").fetchall()
+    agents_list = [dict(r) for r in rows]
+    
+    # Try to sync with gateway sessions for live status
+    try:
+        async with httpx.AsyncClient(verify=False, timeout=5) as client:
+            headers = {}
+            if GATEWAY_TOKEN:
+                headers["Authorization"] = f"Bearer {GATEWAY_TOKEN}"
+            # Try multiple auth methods
+            resp = None
+            for attempt in [
+                lambda: client.get(f"{GATEWAY_URL}/api/v1/sessions", headers=headers),
+                lambda: client.get(f"{GATEWAY_URL}/api/sessions", headers=headers),
+            ]:
+                try:
+                    resp = await attempt()
+                    if resp.status_code == 200:
+                        break
+                except:
+                    continue
+            
+            if resp and resp.status_code == 200:
+                sessions = resp.json()
+                # Map active sessions to agents
+                active_agents = set()
+                for s in sessions:
+                    agent_id = s.get("agent") or s.get("agentId") or ""
+                    if agent_id and s.get("status") in ("running", "active", "busy"):
+                        active_agents.add(agent_id)
+                
+                # Update agent statuses
+                for agent in agents_list:
+                    if agent["name"] in active_agents:
+                        agent["status"] = "busy"
+                    elif agent["status"] == "busy":
+                        # If DB says busy but gateway says no active session, mark idle
+                        agent["status"] = "idle"
+    except:
+        pass  # Gateway unreachable, use DB status
+    
     conn.close()
-    return [dict(r) for r in rows]
+    return agents_list
 
 @app.patch("/api/agents/{name}")
 def update_agent(name: str, a: AgentUpdate):
