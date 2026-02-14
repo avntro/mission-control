@@ -5,12 +5,13 @@ from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query, Response
+from fastapi import FastAPI, HTTPException, Query, Response, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field
+import asyncio
 
 DB_PATH = os.environ.get("MC_DB", "/data/mission_control.db")
 GATEWAY_URL = os.environ.get("GATEWAY_URL", "https://100.101.174.1:18789")
@@ -249,6 +250,16 @@ def init_db():
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS task_events (
+        id TEXT PRIMARY KEY,
+        task_id TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        agent TEXT DEFAULT '',
+        details TEXT DEFAULT '',
+        old_value TEXT DEFAULT '',
+        new_value TEXT DEFAULT '',
+        created_at TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS attachments (
         id TEXT PRIMARY KEY,
         task_id TEXT NOT NULL,
@@ -445,6 +456,8 @@ def get_task(task_id: str):
     task["history"] = [dict(h) for h in history]
     attachments = conn.execute("SELECT * FROM attachments WHERE task_id = ? ORDER BY created_at ASC", (task_id,)).fetchall()
     task["attachments"] = [dict(a) for a in attachments]
+    events = conn.execute("SELECT * FROM task_events WHERE task_id = ? ORDER BY created_at ASC", (task_id,)).fetchall()
+    task["events"] = [dict(e) for e in events]
     conn.close()
     return task
 
@@ -458,10 +471,13 @@ def create_task(t: TaskCreate):
         (tid, t.title, t.description, t.assigned_agent, t.priority, t.status, t.model, t.cost, t.tokens, ts, ts)
     )
     add_activity(conn, t.assigned_agent, "task_created", f"Created: {t.title}", tid)
+    add_task_event(conn, tid, "created", t.assigned_agent, f"Task created: {t.title}")
     conn.commit()
     row = conn.execute("SELECT * FROM tasks WHERE id = ?", (tid,)).fetchone()
+    result = dict(row)
+    broadcast_sse("task_created", result)
     conn.close()
-    return dict(row)
+    return result
 
 @app.patch("/api/tasks/{task_id}")
 def update_task(task_id: str, t: TaskUpdate):
@@ -499,13 +515,17 @@ def update_task(task_id: str, t: TaskUpdate):
                 pass
         add_activity(conn, old["assigned_agent"], "status_change",
                      f"{old['status']} → {updates['status']}: {old['title']}", task_id)
+        add_task_event(conn, task_id, "status_change", old["assigned_agent"] or "",
+                      f"Status changed: {old['status']} → {updates['status']}", old["status"], updates["status"])
     set_clause = ", ".join(f"{k} = ?" for k in updates)
     vals = list(updates.values()) + [task_id]
     conn.execute(f"UPDATE tasks SET {set_clause} WHERE id = ?", vals)
     conn.commit()
     row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    result = dict(row)
+    broadcast_sse("task_updated", result)
     conn.close()
-    return dict(row)
+    return result
 
 @app.delete("/api/tasks/{task_id}")
 def delete_task(task_id: str):
@@ -1710,6 +1730,7 @@ def get_live_tasks(agents: str = "dev"):
 
             updated_iso = datetime.fromtimestamp(updated_at / 1000, tz=timezone.utc).isoformat() if updated_at else ""
             completed_at = updated_iso if status in ("review", "done") else None
+            risk = classify_risk(full_description) if status == "review" else {"level": "LOW", "color": "#4caf50", "bg": "rgba(76,175,80,0.15)"}
 
             tasks_list.append({
                 "id": f"live-{sid[:8]}",
@@ -1728,6 +1749,7 @@ def get_live_tasks(agents: str = "dev"):
                 "completed_at": completed_at,
                 "duration": duration,
                 "is_live": True,
+                "risk": risk,
             })
 
     # Sort: active first, then by updated_at desc
@@ -2167,6 +2189,266 @@ def serve_report_image(filename: str):
     if not os.path.exists(fpath):
         raise HTTPException(404, "Image not found")
     return FileResponse(fpath)
+
+# ── SSE Event Bus ───────────────────────────────────────────
+_sse_clients: list = []
+
+def broadcast_sse(event_type: str, payload: dict):
+    """Push event to all connected SSE clients."""
+    data = json.dumps({"type": event_type, "payload": payload})
+    for q in list(_sse_clients):
+        try:
+            q.put_nowait(data)
+        except:
+            pass
+
+async def sse_generator(request: Request):
+    q = asyncio.Queue()
+    _sse_clients.append(q)
+    try:
+        while True:
+            if await request.is_disconnected():
+                break
+            try:
+                data = await asyncio.wait_for(q.get(), timeout=30)
+                yield f"data: {data}\n\n"
+            except asyncio.TimeoutError:
+                yield ": keepalive\n\n"
+    finally:
+        _sse_clients.remove(q)
+
+@app.get("/api/events/stream")
+async def sse_stream(request: Request):
+    return StreamingResponse(sse_generator(request), media_type="text/event-stream",
+                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+# ── Task Events (Activity Timeline) ────────────────────────────
+def add_task_event(conn, task_id, event_type, agent="", details="", old_value="", new_value=""):
+    eid = str(uuid.uuid4())[:8]
+    ts = now_iso()
+    conn.execute(
+        "INSERT INTO task_events (id, task_id, event_type, agent, details, old_value, new_value, created_at) VALUES (?,?,?,?,?,?,?,?)",
+        (eid, task_id, event_type, agent, details, old_value, new_value, ts)
+    )
+    broadcast_sse("task_event", {"task_id": task_id, "event_type": event_type, "agent": agent, "details": details, "created_at": ts})
+
+@app.get("/api/tasks/{task_id}/events")
+def get_task_events(task_id: str):
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM task_events WHERE task_id = ? ORDER BY created_at ASC", (task_id,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+# ── Risk Classification ─────────────────────────────────────────
+def classify_risk(text: str) -> dict:
+    """Classify command/text risk level."""
+    if not text:
+        return {"level": "LOW", "color": "#4caf50", "bg": "rgba(76,175,80,0.15)"}
+    t = text.lower()
+    high_patterns = ["rm ", "rm -rf", "sudo ", "docker ", "kill ", "chmod ", "mkfs", "drop ", "delete from", "truncate ", "format "]
+    medium_patterns = ["npm install", "pip install", "apt ", "brew ", "curl ", "wget ", "git push", "config", "mv ", "cp -r", "chown"]
+    for p in high_patterns:
+        if p in t:
+            return {"level": "HIGH", "color": "#ff5252", "bg": "rgba(255,82,82,0.15)"}
+    for p in medium_patterns:
+        if p in t:
+            return {"level": "MEDIUM", "color": "#ffab40", "bg": "rgba(255,171,64,0.15)"}
+    return {"level": "LOW", "color": "#4caf50", "bg": "rgba(76,175,80,0.15)"}
+
+# ── Approval Center (Gateway approvals proxy) ──────────────────
+@app.get("/api/approvals")
+async def get_approvals():
+    """Fetch pending approvals from OpenClaw gateway."""
+    try:
+        async with httpx.AsyncClient(verify=False, timeout=10) as client:
+            headers = {"Authorization": f"Bearer {GATEWAY_TOKEN}"} if GATEWAY_TOKEN else {}
+            resp = await client.get(f"{GATEWAY_URL}/api/approvals", headers=headers)
+            if resp.status_code == 200:
+                data = resp.json()
+                items = data if isinstance(data, list) else data.get("approvals", [])
+                # Enrich with risk levels
+                for item in items:
+                    cmd = item.get("command", item.get("cmd", ""))
+                    item["risk"] = classify_risk(cmd)
+                return {"approvals": items}
+    except Exception:
+        pass
+    return {"approvals": []}
+
+@app.post("/api/approvals/{approval_id}/resolve")
+async def resolve_approval(approval_id: str, body: dict):
+    """Forward approval decision to gateway."""
+    try:
+        async with httpx.AsyncClient(verify=False, timeout=10) as client:
+            headers = {"Authorization": f"Bearer {GATEWAY_TOKEN}"} if GATEWAY_TOKEN else {}
+            resp = await client.post(f"{GATEWAY_URL}/api/approvals/{approval_id}/resolve",
+                                     headers=headers, json=body)
+            if resp.status_code == 200:
+                return resp.json()
+    except Exception:
+        pass
+    raise HTTPException(502, "Failed to resolve approval")
+
+# ── Cost Dashboard ──────────────────────────────────────────────
+@app.get("/api/cost-dashboard")
+def get_cost_dashboard():
+    """Aggregate token/cost data per agent from session files."""
+    agents_dir = os.path.join(OPENCLAW_HOME, "agents")
+    result = {"agents": [], "total_tokens": 0, "total_cost": 0.0, "daily": []}
+    daily_buckets = {}
+    
+    for agent_name in os.listdir(agents_dir):
+        agent_dir = os.path.join(agents_dir, agent_name)
+        sessions_file = os.path.join(agent_dir, "sessions", "sessions.json")
+        if not os.path.exists(sessions_file):
+            continue
+        try:
+            with open(sessions_file, "r") as f:
+                sessions_data = json.load(f)
+        except:
+            continue
+        
+        agent_tokens = 0
+        agent_cost = 0.0
+        agent_sessions = 0
+        
+        for session_key, sess_info in sessions_data.items():
+            sid = sess_info.get("sessionId", "")
+            jsonl_path = os.path.join(agent_dir, "sessions", f"{sid}.jsonl")
+            if not os.path.exists(jsonl_path):
+                continue
+            agent_sessions += 1
+            sess_tokens = 0
+            sess_cost = 0.0
+            sess_date = ""
+            try:
+                with open(jsonl_path, "rb") as f:
+                    f.seek(0, 2)
+                    fsize = f.tell()
+                    read_size = min(fsize, 50_000)
+                    f.seek(max(0, fsize - read_size))
+                    tail = f.read().decode("utf-8", errors="replace")
+                    for line in reversed(tail.strip().split("\n")):
+                        try:
+                            entry = json.loads(line)
+                            usage = entry.get("message", {}).get("usage", {})
+                            if usage and usage.get("totalTokens", 0) > sess_tokens:
+                                sess_tokens = usage["totalTokens"]
+                                cost_data = usage.get("cost", {})
+                                sess_cost = cost_data.get("total", 0) if isinstance(cost_data, dict) else 0
+                                break
+                        except:
+                            continue
+                # Get session date from first line
+                with open(jsonl_path, "r") as f:
+                    first = f.readline()
+                    try:
+                        entry = json.loads(first)
+                        ts = entry.get("timestamp", "")
+                        if ts:
+                            sess_date = ts[:10]
+                    except:
+                        pass
+            except:
+                continue
+            
+            agent_tokens += sess_tokens
+            agent_cost += sess_cost
+            if sess_date:
+                if sess_date not in daily_buckets:
+                    daily_buckets[sess_date] = {"date": sess_date, "tokens": 0, "cost": 0.0, "agents": {}}
+                daily_buckets[sess_date]["tokens"] += sess_tokens
+                daily_buckets[sess_date]["cost"] += sess_cost
+                daily_buckets[sess_date]["agents"][agent_name] = daily_buckets[sess_date]["agents"].get(agent_name, 0) + sess_tokens
+        
+        if agent_tokens > 0 or agent_sessions > 0:
+            # Get agent display info
+            conn = get_db()
+            row = conn.execute("SELECT display_name, emoji FROM agents WHERE name = ?", (agent_name,)).fetchone()
+            conn.close()
+            result["agents"].append({
+                "name": agent_name,
+                "display_name": row["display_name"] if row else agent_name,
+                "emoji": row["emoji"] if row else "🤖",
+                "tokens": agent_tokens,
+                "cost": round(agent_cost, 4),
+                "sessions": agent_sessions,
+            })
+            result["total_tokens"] += agent_tokens
+            result["total_cost"] += agent_cost
+    
+    result["total_cost"] = round(result["total_cost"], 4)
+    result["daily"] = sorted(daily_buckets.values(), key=lambda x: x["date"], reverse=True)[:30]
+    result["agents"].sort(key=lambda x: x["tokens"], reverse=True)
+    return result
+
+# ── Chat with Agents ────────────────────────────────────────────
+class ChatMessage(BaseModel):
+    message: str
+    agent: str = "main"
+    session_key: str = ""
+
+@app.post("/api/chat/send")
+async def chat_send(msg: ChatMessage):
+    """Send a message to an agent via OpenClaw chat completions API."""
+    session_key = msg.session_key or f"mission-control:chat:{msg.agent}"
+    try:
+        async with httpx.AsyncClient(verify=False, timeout=120) as client:
+            headers = {"Authorization": f"Bearer {GATEWAY_TOKEN}"} if GATEWAY_TOKEN else {}
+            resp = await client.post(f"{GATEWAY_URL}/v1/chat/completions", headers=headers, json={
+                "model": msg.agent,
+                "messages": [{"role": "user", "content": msg.message}],
+                "stream": False,
+                "metadata": {"sessionKey": session_key}
+            })
+            if resp.status_code == 200:
+                data = resp.json()
+                content = ""
+                if "choices" in data and data["choices"]:
+                    content = data["choices"][0].get("message", {}).get("content", "")
+                return {"response": content, "session_key": session_key}
+    except Exception as e:
+        raise HTTPException(502, f"Chat failed: {str(e)}")
+    raise HTTPException(502, "Chat request failed")
+
+@app.get("/api/chat/history")
+async def chat_history(session_key: str = "", agent: str = "main", limit: int = 50):
+    """Get chat history from session file."""
+    sk = session_key or f"mission-control:chat:{agent}"
+    agents_dir = os.path.join(OPENCLAW_HOME, "agents")
+    agent_dir = os.path.join(agents_dir, agent)
+    sessions_file = os.path.join(agent_dir, "sessions", "sessions.json")
+    messages = []
+    if not os.path.exists(sessions_file):
+        return {"messages": messages}
+    try:
+        with open(sessions_file, "r") as f:
+            sessions_data = json.load(f)
+        sess_info = sessions_data.get(sk)
+        if not sess_info:
+            return {"messages": messages}
+        sid = sess_info.get("sessionId", "")
+        jsonl_path = os.path.join(agent_dir, "sessions", f"{sid}.jsonl")
+        if not os.path.exists(jsonl_path):
+            return {"messages": messages}
+        with open(jsonl_path, "r") as f:
+            for line in f:
+                try:
+                    entry = json.loads(line)
+                    if entry.get("type") == "message":
+                        msg = entry.get("message", {})
+                        role = msg.get("role", "")
+                        if role in ("user", "assistant"):
+                            content = msg.get("content", "")
+                            if isinstance(content, list):
+                                text_parts = [c.get("text", "") for c in content if isinstance(c, dict) and c.get("type") == "text"]
+                                content = "\n".join(text_parts)
+                            messages.append({"role": role, "content": content, "timestamp": entry.get("timestamp", "")})
+                except:
+                    continue
+    except:
+        pass
+    return {"messages": messages[-limit:]}
 
 # ── No-cache middleware for static assets ───────────────────────
 class NoCacheStaticMiddleware(BaseHTTPMiddleware):

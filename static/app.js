@@ -169,12 +169,14 @@ const PATH_TO_PAGE = {
   '/org-chart': 'orgchart', '/orgchart': 'orgchart',
   '/scheduled-tasks': 'scheduled', '/scheduled': 'scheduled',
   '/workspaces': 'workspaces', '/standups': 'standups',
-  '/actions': 'actions', '/docs': 'docs', '/reports': 'reports', '/voice': 'voice',
+  '/actions': 'actions', '/docs': 'docs', '/reports': 'reports',
+  '/costs': 'costs', '/cost-dashboard': 'costs', '/chat': 'chat', '/voice': 'voice',
 };
 const PAGE_TO_PATH = {
   'dashboard': '/', 'taskmanager': '/task-manager', 'orgchart': '/org-chart',
   'scheduled': '/scheduled-tasks', 'workspaces': '/workspaces', 'standups': '/standups',
-  'actions': '/actions', 'docs': '/docs', 'reports': '/reports', 'voice': '/voice',
+  'actions': '/actions', 'docs': '/docs', 'reports': '/reports',
+  'costs': '/costs', 'chat': '/chat', 'voice': '/voice',
 };
 
 function navigateTo(page, pushState = true) {
@@ -193,6 +195,8 @@ function navigateTo(page, pushState = true) {
   if (page === 'actions') loadActionItems();
   if (page === 'docs') loadDocs();
   if (page === 'reports') loadReports();
+  if (page === 'costs') loadCostDashboard();
+  if (page === 'chat') loadChatPanel();
 }
 
 window.addEventListener('popstate', (e) => {
@@ -284,6 +288,7 @@ function liveTaskCardHTML(t) {
       <span class="task-time" data-time-ago="${timeRef}" data-time-prefix="${timeLabel}">${timeLabel}${timeAgo(timeRef)}</span>
     </div>
     ${modelStr !== '—' || costStr !== '—' ? `<div class="task-model-cost">${modelStr} · ${costStr}</div>` : ''}
+    ${t.risk && t.risk.level !== 'LOW' && t.status === 'review' ? `<div class="task-risk-badge risk-${t.risk.level.toLowerCase()}" style="color:${t.risk.color};background:${t.risk.bg}">⚠️ ${t.risk.level} RISK</div>` : ''}
     ${t.status === 'review' ? `<div class="task-review-actions" onclick="event.stopPropagation()"><button class="btn-approve" onclick="approveTask('${t.id}')">✅ Approve</button><button class="btn-reject" onclick="rejectTask('${t.id}')">↩️ Reject</button></div>` : ''}
   </div>`;
 }
@@ -646,6 +651,31 @@ function buildPremiumModal(t, isLive) {
   return html;
 }
 
+function renderActivityTimeline(t) {
+  const events = t.events || [];
+  if (!events.length) return '';
+  const EVENT_ICONS = {
+    'created': '🆕', 'status_change': '🔄', 'comment_added': '💬',
+    'task_approved': '✅', 'task_rejected': '↩️', 'spawned': '🔀',
+    'completed': '🏁', 'error': '❌',
+  };
+  let html = `<div class="detail-section"><h3>📜 Activity Timeline (${events.length})</h3><div class="timeline-scroll"><div class="timeline-list">`;
+  events.forEach(e => {
+    const icon = EVENT_ICONS[e.event_type] || '📌';
+    const agentInfo = AGENT_INFO[e.agent] || { name: e.agent || 'System', emoji: '🤖' };
+    html += `<div class="timeline-item">
+      <div class="timeline-dot">${icon}</div>
+      <div class="timeline-content">
+        <div class="timeline-header"><span class="timeline-agent">${agentInfo.emoji} ${esc(agentInfo.name)}</span><span class="timeline-type">${esc(e.event_type.replace(/_/g, ' '))}</span><span class="timeline-time" data-time-ago="${e.created_at}">${timeAgo(e.created_at)}</span></div>
+        <div class="timeline-details">${esc(e.details || '')}</div>
+        ${e.old_value && e.new_value ? `<div class="timeline-change"><span class="timeline-old">${esc(e.old_value)}</span> → <span class="timeline-new">${esc(e.new_value)}</span></div>` : ''}
+      </div>
+    </div>`;
+  });
+  html += '</div></div></div>';
+  return html;
+}
+
 async function openDetail(id) {
   try {
     const res = await fetch(`${API}/api/tasks/${id}`);
@@ -683,7 +713,10 @@ async function openDetail(id) {
       html += '</div></div>';
     }
 
-    // 9. History
+    // 9. Activity Timeline (events)
+    html += renderActivityTimeline(t);
+
+    // 10. History
     if (t.history && t.history.length) {
       html += `<div class="detail-section"><h3>History</h3><div class="history-scroll"><div class="history-list">`;
       t.history.forEach(h => {
@@ -692,11 +725,11 @@ async function openDetail(id) {
       html += '</div></div></div>';
     }
 
-    // 10. Approve/Reject for review tasks
+    // 11. Approve/Reject for review tasks
     if (t.status === 'review') {
       html += `<div class="detail-section"><div class="task-review-actions" style="justify-content:center"><button class="btn-approve" style="padding:10px 24px;font-size:.9rem" onclick="approveTask('${t.id}')">✅ Approve &amp; Mark Done</button><button class="btn-reject" style="padding:10px 24px;font-size:.9rem" onclick="rejectTask('${t.id}')">↩️ Reject &amp; Send Back</button></div></div>`;
     }
-    // 11. Add Comment
+    // 12. Add Comment
     html += `<div class="detail-section"><h3>Add Comment</h3><textarea id="commentText" rows="3" placeholder="Add a comment..." style="width:100%;padding:10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--card);color:var(--text);font-family:inherit;font-size:.83rem;margin-bottom:8px"></textarea><button class="btn btn-sm" style="background:var(--red);color:#fff;border-color:var(--red)" onclick="addComment('${t.id}')">Add Comment</button></div>`;
 
     document.getElementById('detailBody').innerHTML = html;
@@ -806,6 +839,9 @@ async function openLiveDetail(id) {
         ${t.updated_at ? `<div>🔄 <strong>Last Update:</strong> <span data-time-ago="${t.updated_at}">${timeAgo(t.updated_at)}</span></div>` : ''}
         ${t.session_key ? `<div>🔑 <strong>Session:</strong> <code style="font-size:.75rem">${esc(t.session_key)}</code></div>` : ''}
       </div></div>`;
+
+      // Activity Timeline
+      html += renderActivityTimeline(t);
 
       // 8. Comments & Logs
       if (t.comments && t.comments.length) {
@@ -1918,6 +1954,176 @@ window.fetch = async function(...args) {
   }
   return _origFetch.apply(this, args);
 };
+
+// ══════════════════════════════════════════════════════════════
+// SSE REAL-TIME UPDATES
+// ══════════════════════════════════════════════════════════════
+let _sseSource = null;
+let _sseReconnectTimer = null;
+
+function connectSSE() {
+  if (_sseSource) return;
+  try {
+    _sseSource = new EventSource('/api/events/stream');
+    _sseSource.onopen = () => { console.log('[SSE] Connected'); };
+    _sseSource.onmessage = (evt) => {
+      if (evt.data.startsWith(':')) return;
+      try {
+        const event = JSON.parse(evt.data);
+        handleSSEEvent(event);
+      } catch(e) { /* ignore parse errors */ }
+    };
+    _sseSource.onerror = () => {
+      _sseSource.close();
+      _sseSource = null;
+      // Reconnect after 5s
+      if (_sseReconnectTimer) clearTimeout(_sseReconnectTimer);
+      _sseReconnectTimer = setTimeout(connectSSE, 5000);
+    };
+  } catch(e) { /* SSE not supported, polling fallback */ }
+}
+
+function handleSSEEvent(event) {
+  const { type, payload } = event;
+  if (type === 'task_created' || type === 'task_updated') {
+    // Refresh board data
+    loadTasks().then(() => loadLiveTasks()).then(() => { if (currentPage === 'dashboard') renderBoard(); });
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => connectSSE());
+
+// ══════════════════════════════════════════════════════════════
+// COST DASHBOARD
+// ══════════════════════════════════════════════════════════════
+
+async function loadCostDashboard() {
+  try {
+    const res = await fetch(`${API}/api/cost-dashboard`);
+    const data = await res.json();
+    renderCostSummary(data);
+    renderCostDailyChart(data.daily);
+    renderCostAgentBreakdown(data.agents);
+  } catch(e) { console.error('Cost dashboard error:', e); }
+}
+
+function renderCostSummary(data) {
+  const el = document.getElementById('costSummaryCards');
+  if (!el) return;
+  el.innerHTML = `
+    <div class="cost-stat-card"><div class="cost-stat-icon" style="background:rgba(108,99,255,0.15)">🔤</div><div class="cost-stat-info"><span class="cost-stat-value">${formatTokens(data.total_tokens)}</span><span class="cost-stat-label">Total Tokens</span></div></div>
+    <div class="cost-stat-card"><div class="cost-stat-icon" style="background:rgba(76,175,80,0.15)">💰</div><div class="cost-stat-info"><span class="cost-stat-value">$${data.total_cost.toFixed(2)}</span><span class="cost-stat-label">Total Cost</span></div></div>
+    <div class="cost-stat-card"><div class="cost-stat-icon" style="background:rgba(0,188,212,0.15)">🤖</div><div class="cost-stat-info"><span class="cost-stat-value">${data.agents.length}</span><span class="cost-stat-label">Active Agents</span></div></div>
+    <div class="cost-stat-card"><div class="cost-stat-icon" style="background:rgba(255,171,64,0.15)">📊</div><div class="cost-stat-info"><span class="cost-stat-value">${data.daily.length}</span><span class="cost-stat-label">Days Tracked</span></div></div>
+  `;
+}
+
+function renderCostDailyChart(daily) {
+  const el = document.getElementById('costDailyChart');
+  if (!el || !daily.length) { if (el) el.innerHTML = '<p style="color:var(--muted);text-align:center;padding:40px">No daily data yet</p>'; return; }
+  const last14 = daily.slice(0, 14).reverse();
+  const maxTokens = Math.max(...last14.map(d => d.tokens), 1);
+  const bars = last14.map(d => {
+    const pct = Math.round(d.tokens / maxTokens * 100);
+    const label = d.date.slice(5); // MM-DD
+    return `<div class="cost-bar-col"><div class="cost-bar" style="height:${Math.max(pct, 2)}%" title="${formatTokens(d.tokens)} tokens · $${d.cost.toFixed(2)}"></div><span class="cost-bar-label">${label}</span></div>`;
+  }).join('');
+  el.innerHTML = `<div class="cost-bar-chart">${bars}</div>`;
+}
+
+function renderCostAgentBreakdown(agents) {
+  const el = document.getElementById('costAgentBreakdown');
+  if (!el) return;
+  if (!agents.length) { el.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">No agent data</p>'; return; }
+  const maxTokens = Math.max(...agents.map(a => a.tokens), 1);
+  el.innerHTML = agents.map(a => {
+    const pct = Math.round(a.tokens / maxTokens * 100);
+    return `<div class="cost-agent-row">
+      <div class="cost-agent-info"><span>${a.emoji} ${esc(a.display_name)}</span><span class="cost-agent-stats">${formatTokens(a.tokens)} tokens · $${a.cost.toFixed(2)} · ${a.sessions} sessions</span></div>
+      <div class="cost-agent-bar-wrap"><div class="cost-agent-bar" style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+// CHAT PANEL
+// ══════════════════════════════════════════════════════════════
+
+let chatAgent = '';
+let chatMessages = [];
+
+async function loadChatPanel() {
+  if (!agents.length) await loadAgents();
+  const el = document.getElementById('chatAgentList');
+  if (!el) return;
+  el.innerHTML = agents.map(a => {
+    const active = chatAgent === a.name ? ' active' : '';
+    return `<div class="ws-file${active}" onclick="selectChatAgent('${a.name}')">${a.emoji} ${a.display_name}</div>`;
+  }).join('');
+}
+
+async function selectChatAgent(name) {
+  chatAgent = name;
+  loadChatPanel();
+  document.getElementById('chatInputBar').style.display = 'flex';
+  const messagesEl = document.getElementById('chatMessages');
+  messagesEl.innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px">Loading history...</p>';
+  try {
+    const res = await fetch(`${API}/api/chat/history?agent=${encodeURIComponent(name)}`);
+    const data = await res.json();
+    chatMessages = data.messages || [];
+    renderChatMessages();
+  } catch(e) {
+    messagesEl.innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px">Ready to chat</p>';
+    chatMessages = [];
+  }
+}
+
+function renderChatMessages() {
+  const el = document.getElementById('chatMessages');
+  if (!chatMessages.length) {
+    const info = AGENT_INFO[chatAgent] || { name: chatAgent, emoji: '🤖' };
+    el.innerHTML = `<div class="ws-placeholder"><span>${info.emoji}</span><p>Start a conversation with ${esc(info.name)}</p></div>`;
+    return;
+  }
+  el.innerHTML = chatMessages.map(m => {
+    const cls = m.role === 'user' ? 'chat-msg-user' : 'chat-msg-assistant';
+    const icon = m.role === 'user' ? '👤' : (AGENT_INFO[chatAgent]?.emoji || '🤖');
+    let content = m.content || '';
+    // Strip <think> blocks
+    content = content.replace(/<think>[\s\S]*?<\/think>/gi, '');
+    content = content.replace(/<\/?final>/gi, '').trim();
+    return `<div class="chat-msg ${cls}"><span class="chat-msg-icon">${icon}</span><div class="chat-msg-content">${renderMarkdown(content)}</div></div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+async function sendChat() {
+  if (!chatAgent) return;
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  chatMessages.push({ role: 'user', content: text });
+  renderChatMessages();
+  const btn = document.getElementById('chatSendBtn');
+  btn.textContent = '⏳';
+  btn.disabled = true;
+  try {
+    const res = await fetch(`${API}/api/chat/send`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ message: text, agent: chatAgent }) });
+    const data = await res.json();
+    if (data.response) {
+      chatMessages.push({ role: 'assistant', content: data.response });
+    } else {
+      chatMessages.push({ role: 'assistant', content: '_Error: No response received_' });
+    }
+  } catch(e) {
+    chatMessages.push({ role: 'assistant', content: `_Error: ${e.message}_` });
+  }
+  btn.textContent = 'Send';
+  btn.disabled = false;
+  renderChatMessages();
+}
 
 function esc(s) { if (!s) return ''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function timeAgo(iso) { if (!iso) return ''; const diff = (Date.now() - new Date(iso).getTime()) / 1000; if (diff < 0) { const f = -diff; if (f < 60) return 'in <1m'; if (f < 3600) return `in ${Math.floor(f/60)}m`; if (f < 86400) return `in ${Math.floor(f/3600)}h`; return `in ${Math.floor(f/86400)}d`; } if (diff < 60) return 'just now'; if (diff < 3600) return `${Math.floor(diff/60)}m ago`; if (diff < 86400) return `${Math.floor(diff/3600)}h ago`; return `${Math.floor(diff/86400)}d ago`; }
