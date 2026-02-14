@@ -417,11 +417,19 @@ async function openDetail(id) {
     const res = await fetch(`${API}/api/tasks/${id}`);
     const t = await res.json();
     document.getElementById('detailTitle').textContent = t.title;
+    // Add status pills to header
+    const headerEl = document.querySelector('#detailModal .modal-header');
+    let existingPills = headerEl.querySelector('.header-pills');
+    if (!existingPills) { existingPills = document.createElement('div'); existingPills.className = 'header-pills'; headerEl.insertBefore(existingPills, headerEl.querySelector('.modal-close')); }
+    const statusPillClass = t.status === 'in_progress' ? 'pill-live' : t.status === 'done' ? 'pill-done' : t.status === 'review' ? 'pill-review' : 'pill-todo';
+    const statusLabel = t.status === 'in_progress' ? '🔄 LIVE' : t.status === 'done' ? '✅ Done' : t.status === 'review' ? '👀 Review' : '📋 Todo';
+    const priorityPill = t.priority ? `<span class="status-pill pill-priority">${t.priority}</span>` : '';
+    existingPills.innerHTML = `<span class="status-pill ${statusPillClass}">${statusLabel}</span>${priorityPill}`;
 
     // 1. Status buttons row
     let html = `<div class="premium-actions">${['todo','in_progress','review','done'].map(s => `<button class="btn btn-sm ${t.status===s?'btn-primary':''}" onclick="moveTask('${t.id}','${s}')">${s.replace('_',' ')}</button>`).join('')}<button class="btn btn-sm btn-danger" onclick="deleteTask('${t.id}')">🗑️</button></div>`;
 
-    // 2-6. Status badge + agent + grid + session
+    // 2-6. Agent + grid + session (status badge now in header)
     html += buildPremiumModal(t, false);
 
     // 7. Description
@@ -519,18 +527,24 @@ function closeLightbox() {
   if (lb) lb.classList.remove('open');
 }
 
-function closeDetail() { document.getElementById('detailModal').classList.remove('open'); }
+function closeDetail() { document.getElementById('detailModal').classList.remove('open'); const pills = document.querySelector('#detailModal .header-pills'); if (pills) pills.remove(); }
 function closeDetailIfOutside(e) { if (e.target === e.currentTarget) closeDetail(); }
 
 function openLiveDetail(id) {
   const t = liveTasks.find(lt => lt.id === id);
   if (!t) return;
   document.getElementById('detailTitle').textContent = t.title;
-
-  // Source badge row
+  // Add status pills to header
+  const headerEl = document.querySelector('#detailModal .modal-header');
+  let existingPills = headerEl.querySelector('.header-pills');
+  if (!existingPills) { existingPills = document.createElement('div'); existingPills.className = 'header-pills'; headerEl.insertBefore(existingPills, headerEl.querySelector('.modal-close')); }
+  const statusPillClass = t.status === 'in_progress' ? 'pill-live' : t.status === 'done' ? 'pill-done' : 'pill-review';
+  const statusLabel = t.status === 'in_progress' ? '🔄 LIVE' : t.status === 'done' ? '✅ Done' : '👀 Review';
   const sourceIcon = t.source === 'cron' ? '⏰' : t.source === 'subagent' ? '🔀' : '🎮';
   const sourceLabel = t.source === 'cron' ? 'Cron Job' : t.source === 'subagent' ? 'Sub-agent' : 'Interactive';
-  let html = `<div class="premium-actions"><span class="live-source-badge">${sourceIcon} ${sourceLabel}</span></div>`;
+  existingPills.innerHTML = `<span class="status-pill ${statusPillClass}">${statusLabel}</span><span class="status-pill pill-priority">${sourceIcon} ${sourceLabel}</span>`;
+
+  let html = '';
 
   // Status badge + agent + grid + session
   html += buildPremiumModal(t, true);
@@ -1332,5 +1346,5 @@ function openSubagentPanel(agentName, evt) {
 
 // ── Helpers ────────────────────────────────────────────────────
 function esc(s) { if (!s) return ''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function timeAgo(iso) { if (!iso) return ''; const diff = (Date.now() - new Date(iso).getTime()) / 1000; if (diff < 60) return 'just now'; if (diff < 3600) return `${Math.floor(diff/60)}m ago`; if (diff < 86400) return `${Math.floor(diff/3600)}h ago`; return `${Math.floor(diff/86400)}d ago`; }
+function timeAgo(iso) { if (!iso) return ''; const diff = (Date.now() - new Date(iso).getTime()) / 1000; if (diff < 0) { const f = -diff; if (f < 60) return 'in <1m'; if (f < 3600) return `in ${Math.floor(f/60)}m`; if (f < 86400) return `in ${Math.floor(f/3600)}h`; return `in ${Math.floor(f/86400)}d`; } if (diff < 60) return 'just now'; if (diff < 3600) return `${Math.floor(diff/60)}m ago`; if (diff < 86400) return `${Math.floor(diff/3600)}h ago`; return `${Math.floor(diff/86400)}d ago`; }
 function formatDuration(secs) { if (!secs) return ''; if (secs < 60) return `${Math.round(secs)}s`; if (secs < 3600) return `${Math.floor(secs/60)}m ${Math.round(secs%60)}s`; return `${Math.floor(secs/3600)}h ${Math.floor((secs%3600)/60)}m`; }
