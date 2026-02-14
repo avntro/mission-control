@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field
 
@@ -267,6 +268,7 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="Mission Control", lifespan=lifespan)
+app.add_middleware(CORSMiddleware, allow_origins=["https://pc1.taildb1204.ts.net:8080", "https://pc1.taildb1204.ts.net:3334", "https://pc1.taildb1204.ts.net:8765"], allow_methods=["GET"], allow_headers=["*"])
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
