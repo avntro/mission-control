@@ -166,12 +166,12 @@ def init_db():
     existing = conn.execute("SELECT COUNT(*) FROM agents").fetchone()[0]
     if existing == 0:
         agents_data = [
-            ("main", "Mike", "anthropic/claude-opus-4-6", "idle", "🎯"),
-            ("trading", "Trading / AA", "anthropic/claude-opus-4-6", "idle", "📈"),
-            ("it-support", "IT Support", "anthropic/claude-sonnet-4-20250514", "idle", "🔧"),
-            ("dev", "Dev", "anthropic/claude-opus-4-6", "idle", "💻"),
-            ("voice", "Voice", "anthropic/claude-sonnet-4-20250514", "idle", "🎙️"),
-            ("troubleshoot", "Troubleshoot", "anthropic/claude-opus-4-6", "idle", "🔍"),
+            ("main", "Mike", "claude-opus-4-6", "idle", "🎯"),
+            ("trading", "Trading / AA", "claude-opus-4-6", "idle", "📈"),
+            ("it-support", "IT Support", "claude-sonnet-4.5", "idle", "🔧"),
+            ("dev", "Dev", "claude-opus-4-6", "idle", "💻"),
+            ("voice", "Voice", "claude-sonnet-4.5", "idle", "🎙️"),
+            ("troubleshoot", "Troubleshoot", "claude-opus-4-6", "idle", "🔍"),
         ]
         conn.executemany(
             "INSERT INTO agents (name, display_name, model, status, emoji) VALUES (?,?,?,?,?)",
@@ -179,12 +179,12 @@ def init_db():
         )
     # Always update model names to correct values (migration)
     model_corrections = [
-        ("main", "anthropic/claude-opus-4-6"),
-        ("trading", "anthropic/claude-opus-4-6"),
-        ("it-support", "anthropic/claude-sonnet-4-20250514"),
-        ("dev", "anthropic/claude-opus-4-6"),
-        ("voice", "anthropic/claude-sonnet-4-20250514"),
-        ("troubleshoot", "anthropic/claude-opus-4-6"),
+        ("main", "claude-opus-4-6"),
+        ("trading", "claude-opus-4-6"),
+        ("it-support", "claude-sonnet-4.5"),
+        ("dev", "claude-opus-4-6"),
+        ("voice", "claude-sonnet-4.5"),
+        ("troubleshoot", "claude-opus-4-6"),
     ]
     for agent_name, correct_model in model_corrections:
         conn.execute("UPDATE agents SET model = ? WHERE name = ?", (correct_model, agent_name))
