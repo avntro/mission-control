@@ -130,14 +130,34 @@ body{
 .activity-header select:hover{border-color:var(--accent)}
 .activity-header select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,188,212,0.15)}
 .activity-header::after{content:'Filter by agent';font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:none}
-.activity-item{display:flex;gap:12px;padding:12px;border-bottom:1px solid var(--border);align-items:flex-start;transition:opacity .4s,transform .4s,background .4s}
+.activity-item{display:flex;gap:12px;padding:14px 12px;border-bottom:1px solid var(--border);align-items:flex-start;transition:opacity .4s,transform .4s,background .4s}
 .activity-item.activity-new{opacity:0;transform:translateY(-8px);background:rgba(0,188,212,0.06)}
-.activity-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.9rem;background:var(--card);flex-shrink:0}
+.activity-item.act-fail{border-left:3px solid var(--red)}
+.activity-item:hover{background:rgba(255,255,255,0.02)}
+.activity-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1rem;background:var(--card);flex-shrink:0;border:2px solid var(--border)}
 .activity-content{flex:1;min-width:0}
-.activity-action{font-size:.83rem;font-weight:500}
-.activity-details{font-size:.76rem;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.activity-time{font-size:.68rem;color:var(--muted);white-space:nowrap}
-.activity-badge{font-size:.62rem;padding:2px 6px;border-radius:6px;margin-left:6px}
+.activity-header-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.act-agent{font-size:.82rem;font-weight:700}
+.act-label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+.activity-body{font-size:.83rem;line-height:1.5}
+.act-task-title{font-weight:600;color:var(--text);margin-top:2px}
+.act-task-ref{font-size:.72rem;color:var(--muted);margin-top:3px}
+.act-detail-text{color:var(--muted);line-height:1.5}
+.act-error-text{color:var(--red)}
+.act-comment-body{background:var(--card);border-left:3px solid var(--accent);padding:8px 12px;border-radius:0 8px 8px 0;font-size:.82rem;line-height:1.5;color:var(--text);margin-top:4px;white-space:pre-wrap;word-break:break-word}
+.act-arrow{color:var(--muted);font-size:.75rem;margin:0 2px}
+.act-status-pill{font-size:.62rem;padding:2px 8px;border-radius:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+.act-status-todo{background:rgba(108,99,255,.15);color:#6c63ff}
+.act-status-in_progress{background:rgba(255,171,64,.15);color:var(--orange)}
+.act-status-review{background:rgba(224,64,251,.15);color:var(--pink)}
+.act-status-done{background:rgba(0,230,118,.12);color:var(--green)}
+.act-cron-badge{font-size:.68rem;padding:2px 8px;border-radius:8px;font-weight:600}
+.act-cron-ok{background:rgba(0,230,118,.12);color:var(--green)}
+.act-cron-fail{background:rgba(255,82,82,.12);color:var(--red)}
+.act-cron-dur{font-size:.72rem;color:var(--accent);margin-left:8px;font-variant-numeric:tabular-nums}
+.act-cron-name{font-weight:600;color:var(--text);margin-right:8px}
+.activity-time{font-size:.68rem;color:var(--muted);white-space:nowrap;min-width:50px;text-align:right}
+.activity-badge{font-size:.62rem;padding:2px 8px;border-radius:6px;font-weight:700}
 .badge-success{background:rgba(0,230,118,.12);color:var(--green)}
 .badge-fail{background:rgba(255,82,82,.12);color:var(--red)}
 
@@ -412,16 +432,20 @@ body{
 
 /* ── Responsive ─────────────────────────────────────────────── */
 @media(max-width:1024px){
-  html,body{height:auto;min-height:100vh;overflow:auto;overflow-x:hidden}
-  body{height:auto;min-height:100vh}
-  .page{overflow-y:visible;flex:none}
-  .page.active{flex:none}
-  .layout{overflow:visible;flex:none}
-  .main{overflow-y:visible;flex:none}
+  html{height:auto !important;min-height:100vh;overflow:auto !important;overflow-x:hidden !important}
+  body{height:auto !important;min-height:100vh !important;overflow:visible !important;overflow-x:hidden !important}
+  .page{overflow-y:visible !important;flex:none !important}
+  .page.active{display:flex;flex-direction:column;flex:none !important}
+  .layout{overflow:visible !important;flex:none !important}
+  .main{overflow-y:visible !important;flex:none !important}
   .kanban{grid-template-columns:repeat(2,1fr)}
+  .kanban-col{min-height:auto}
+  .col-cards{max-height:none !important;overflow-y:visible !important}
   .agent-cards-row{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
   .voice-features{grid-template-columns:1fr}
-  .sidebar{width:220px;min-width:220px}
+  .sidebar{width:220px;min-width:220px;overflow-y:visible !important}
+  .tab-content.active{min-height:auto !important;flex:none !important}
+  .scheduled-sections,.workspace-layout{min-height:auto}
 }
 @media(max-width:768px){
   .layout{flex-direction:column;height:auto}
@@ -469,6 +493,8 @@ body{
 
 /* Live task cards */
 .task-live-badge{font-size:.6rem;font-weight:700;color:var(--green);letter-spacing:.5px;margin-bottom:2px}
+.task-live-badge.badge-done{color:var(--accent)}
+.task-live-badge.badge-review{color:var(--pink)}
 .live-task{border-left:3px solid var(--green) !important}
 .live-task.live-pulse{animation:livePulse 2s ease-in-out infinite}
 @keyframes livePulse{0%,100%{border-left-color:var(--green)}50%{border-left-color:var(--orange)}}

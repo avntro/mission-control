@@ -198,8 +198,10 @@ function liveTaskCardHTML(t) {
   const costStr = t.cost != null && t.cost > 0 ? `$${t.cost.toFixed(2)}` : '—';
   const timeRef = (t.status === 'done' || t.status === 'review') ? (t.completed_at || t.updated_at || t.created_at) : t.created_at;
   const timeLabel = (t.status === 'done' || t.status === 'review') ? 'completed ' : '';
+  const badgeLabel = t.status === 'done' ? '✅ DONE' : t.status === 'review' ? '👀 REVIEW' : `${sourceIcon} LIVE`;
+  const badgeClass = t.status === 'in_progress' ? 'task-live-badge' : 'task-live-badge' + (t.status === 'done' ? ' badge-done' : ' badge-review');
   return `<div class="task-card live-task${activePulse}" data-id="${t.id}" onclick="openLiveDetail('${t.id}')">
-    <div class="task-live-badge">${sourceIcon} LIVE</div>
+    <div class="${badgeClass}">${badgeLabel}</div>
     <div class="task-title">${esc(t.title)}</div>
     <div class="task-meta">
       <span class="task-agent">${info.emoji} ${info.name}</span>
@@ -348,13 +350,117 @@ async function loadActivity() {
 }
 
 function activityItemHTML(a) {
-  const icons = { task_created:'📦', task_started:'🚀', task_completed:'✅', task_error:'❌', status_change:'🔄', comment_added:'💬', cron_run:'⏰' };
-  const icon = icons[a.action] || '📌';
-  const ag = agents.find(ag => ag.name === a.agent);
+  const ag = agents.find(x => x.name === a.agent);
+  const agentEmoji = ag ? ag.emoji : '🤖';
   const agentName = ag ? ag.display_name : (a.agent || 'System');
-  const successBadge = a.success ? '' : '<span class="activity-badge badge-fail">Failed</span>';
-  const dur = a.duration ? `<span class="activity-badge badge-success">⏱ ${formatDuration(a.duration)}</span>` : '';
-  return `<div class="activity-item" data-activity-id="${a.id}"><div class="activity-icon">${icon}</div><div class="activity-content"><div class="activity-action">${esc(agentName)} — ${a.action.replace(/_/g,' ')}${successBadge}${dur}</div><div class="activity-details">${esc(a.details || '')}</div></div><div class="activity-time" data-time-ago="${a.created_at}">${timeAgo(a.created_at)}</div></div>`;
+  const agentColor = AGENT_INFO[a.agent]?.color || 'var(--accent)';
+  const details = a.details || '';
+  const isFail = !a.success;
+  const statusCls = isFail ? 'act-fail' : 'act-ok';
+
+  let icon, label, body;
+
+  switch (a.action) {
+    case 'status_change': {
+      icon = '🔄';
+      label = 'status change';
+      // Parse "from → to: Task Title"
+      const m = details.match(/^(\S+)\s*→\s*(\S+):\s*(.*)$/);
+      if (m) {
+        const fromBadge = `<span class="act-status-pill act-status-${m[1]}">${m[1].replace('_',' ')}</span>`;
+        const toBadge = `<span class="act-status-pill act-status-${m[2]}">${m[2].replace('_',' ')}</span>`;
+        body = `${fromBadge} <span class="act-arrow">→</span> ${toBadge}<div class="act-task-title">${esc(m[3])}</div>`;
+      } else {
+        body = `<div class="act-detail-text">${esc(details)}</div>`;
+      }
+      break;
+    }
+    case 'comment_added': {
+      icon = '💬';
+      label = 'comment';
+      const taskTitle = a.task_id ? tasks.find(t => t.id === a.task_id)?.title : null;
+      body = `<div class="act-comment-body">${esc(details)}</div>`;
+      if (taskTitle) body += `<div class="act-task-ref">on <strong>${esc(taskTitle)}</strong></div>`;
+      break;
+    }
+    case 'task_created': {
+      icon = '📦';
+      label = 'new task';
+      // Parse "Created: Title"
+      const title = details.replace(/^Created:\s*/i, '');
+      body = `<div class="act-task-title">${esc(title)}</div>`;
+      break;
+    }
+    case 'task_started': {
+      icon = '🚀';
+      label = 'started';
+      body = `<div class="act-task-title">${esc(details)}</div>`;
+      break;
+    }
+    case 'task_completed': {
+      icon = '✅';
+      label = 'completed';
+      body = `<div class="act-task-title">${esc(details)}</div>`;
+      break;
+    }
+    case 'task_error': {
+      icon = '❌';
+      label = 'error';
+      body = `<div class="act-detail-text act-error-text">${esc(details)}</div>`;
+      break;
+    }
+    case 'cron_run': {
+      icon = '⏰';
+      label = 'cron';
+      // Parse "Status: ok | Duration: 9497ms" or "Job: name | Status: ok | Duration: 1234ms"
+      const statusM = details.match(/Status:\s*(\w+)/i);
+      const durM = details.match(/Duration:\s*(\d+)ms/i);
+      const jobM = details.match(/Job:\s*([^|]+)/i);
+      const cronStatus = statusM ? statusM[1] : 'unknown';
+      const cronDurMs = durM ? parseInt(durM[1]) : null;
+      const cronJob = jobM ? jobM[1].trim() : null;
+      const sBadge = cronStatus === 'ok'
+        ? '<span class="act-cron-badge act-cron-ok">✓ ok</span>'
+        : `<span class="act-cron-badge act-cron-fail">✗ ${esc(cronStatus)}</span>`;
+      const dBadge = cronDurMs != null ? `<span class="act-cron-dur">⏱ ${formatDuration(cronDurMs / 1000)}</span>` : '';
+      body = `${cronJob ? `<span class="act-cron-name">${esc(cronJob)}</span>` : ''}${sBadge}${dBadge}`;
+      break;
+    }
+    case 'subagent_spawned': {
+      icon = '🔀';
+      label = 'spawned sub-agent';
+      body = `<div class="act-task-title">${esc(details)}</div>`;
+      break;
+    }
+    case 'subagent_completed': {
+      icon = '🏁';
+      label = 'sub-agent done';
+      const durM2 = details.match(/Duration:\s*(\d+)s/i);
+      const durStr = durM2 ? `<span class="act-cron-dur">⏱ ${formatDuration(parseInt(durM2[1]))}</span>` : '';
+      body = `<div class="act-task-title">${esc(details.replace(/\s*\|\s*Duration:.*$/, ''))}</div>${durStr}`;
+      break;
+    }
+    default: {
+      icon = '📌';
+      label = a.action.replace(/_/g, ' ');
+      body = details ? `<div class="act-detail-text">${esc(details)}</div>` : '';
+    }
+  }
+
+  const failBadge = isFail ? '<span class="activity-badge badge-fail">FAILED</span>' : '';
+
+  return `<div class="activity-item ${statusCls}" data-activity-id="${a.id}">
+    <div class="activity-icon" style="border-color:${agentColor}">${agentEmoji}</div>
+    <div class="activity-content">
+      <div class="activity-header-row">
+        <span class="act-agent" style="color:${agentColor}">${esc(agentName)}</span>
+        <span class="act-label">${icon} ${label}</span>
+        ${failBadge}
+      </div>
+      <div class="activity-body">${body}</div>
+    </div>
+    <div class="activity-time" data-time-ago="${a.created_at}">${timeAgo(a.created_at)}</div>
+  </div>`;
 }
 
 function renderActivity(items, fullReplace) {
