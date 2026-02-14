@@ -375,13 +375,13 @@ async function openDetail(id) {
     html += renderAttachmentsSection(t);
     if (t.comments && t.comments.length) {
       html += `<div class="detail-section"><h3>Comments & Logs (${t.comments.length})</h3>`;
-      t.comments.forEach(c => { const cA = agents.find(a => a.name === c.agent); const cN = cA ? cA.display_name : (c.agent || 'System'); html += `<div class="comment-item type-${c.type}"><div class="comment-header"><span>${esc(cN)} · ${c.type}</span><span>${timeAgo(c.created_at)}</span></div><div class="comment-content">${esc(c.content)}</div></div>`; });
+      t.comments.forEach(c => { const cA = agents.find(a => a.name === c.agent); const cN = cA ? cA.display_name : (c.agent || 'System'); html += `<div class="comment-item type-${c.type}"><div class="comment-header"><span><span class="comment-agent">${esc(cN)}</span><span class="comment-type">${c.type}</span></span><span data-time-ago="${c.created_at}">${timeAgo(c.created_at)}</span></div><div class="comment-content">${esc(c.content)}</div></div>`; });
       html += '</div>';
     }
     if (t.history && t.history.length) {
-      html += `<div class="detail-section"><h3>History</h3>`;
-      t.history.forEach(h => { html += `<div class="history-item"><span class="history-time">${timeAgo(h.created_at)}</span><span>${h.action.replace(/_/g,' ')} — ${esc(h.details || '')}</span></div>`; });
-      html += '</div>';
+      html += `<div class="detail-section"><h3>History</h3><div class="history-list">`;
+      t.history.forEach(h => { html += `<div class="history-item"><span class="history-time" data-time-ago="${h.created_at}">${timeAgo(h.created_at)}</span><span class="history-action">${h.action.replace(/_/g,' ')}</span><span class="history-detail">— ${esc(h.details || '')}</span></div>`; });
+      html += '</div></div>';
     }
     html += `<div class="detail-section"><h3>Add Comment</h3><textarea id="commentText" rows="2" placeholder="Add a comment..." style="width:100%;padding:10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--card);color:var(--text);font-family:inherit;font-size:.83rem;margin-bottom:8px"></textarea><button class="btn btn-sm btn-primary" onclick="addComment('${t.id}')">Add Comment</button></div>`;
     document.getElementById('detailBody').innerHTML = html;
