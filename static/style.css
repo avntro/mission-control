@@ -432,20 +432,20 @@ body{
 
 /* ── Responsive ─────────────────────────────────────────────── */
 @media(max-width:1024px){
-  html{height:auto !important;min-height:100vh;overflow:auto !important;overflow-x:hidden !important}
-  body{height:auto !important;min-height:100vh !important;overflow:visible !important;overflow-x:hidden !important}
-  .page{overflow-y:visible !important;flex:none !important}
-  .page.active{display:flex;flex-direction:column;flex:none !important}
-  .layout{overflow:visible !important;flex:none !important}
-  .main{overflow-y:visible !important;flex:none !important}
-  .kanban{grid-template-columns:repeat(2,1fr)}
-  .kanban-col{min-height:auto}
-  .col-cards{max-height:none !important;overflow-y:visible !important}
+  html{height:100%;overflow:hidden}
+  body{height:100vh;overflow:hidden}
+  .page{overflow-y:auto;flex:1;min-height:0}
+  .page.active{display:flex;flex-direction:column;flex:1;min-height:0}
+  .layout{overflow:hidden;flex:1;min-height:0}
+  .main{overflow-y:auto;flex:1;min-height:0}
+  .kanban{grid-template-columns:repeat(2,1fr);flex:1;min-height:0}
+  .kanban-col{min-height:200px;max-height:100%;overflow:hidden}
+  .col-cards{max-height:none;overflow-y:auto;flex:1;min-height:0}
   .agent-cards-row{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
   .voice-features{grid-template-columns:1fr}
-  .sidebar{width:220px;min-width:220px;overflow-y:visible !important}
-  .tab-content.active{min-height:auto !important;flex:none !important}
-  .scheduled-sections,.workspace-layout{min-height:auto}
+  .sidebar{width:220px;min-width:220px;overflow-y:auto}
+  .tab-content.active{min-height:0;flex:1}
+  .scheduled-sections,.workspace-layout{min-height:0}
 }
 @media(max-width:768px){
   .layout{flex-direction:column;height:auto}
@@ -565,8 +565,8 @@ body{
 .agent-card-lg:hover{border-color:var(--accent);transform:translateY(-2px)}
 
 /* ── Scrollable Lists (constrained height + elegant scrollbar) ── */
-.col-cards{max-height:calc(100vh - 320px)}
-#col-done{max-height:400px}
+.col-cards{max-height:calc(100vh - 280px)}
+#col-done{max-height:calc(100vh - 280px)}
 .detail-section .comment-item:first-child{margin-top:0}
 .comments-scroll,.history-scroll,.subagent-scroll,.activity-scroll,.overnight-scroll{
   max-height:400px;overflow-y:auto;
