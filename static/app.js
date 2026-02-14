@@ -83,7 +83,12 @@ function tickTimers() {
 
 async function loadAll() {
   await Promise.all([loadTasks(), loadAgents(), loadAgentStats(), loadLiveTasks()]);
-  if (currentPage === 'dashboard') renderBoard();
+  if (currentPage === 'dashboard') {
+    renderBoard();
+    // Poll activity if the activity tab is visible
+    const actTab = document.querySelector('.tab[data-tab="activity"]');
+    if (actTab && actTab.classList.contains('active')) loadActivity();
+  }
 }
 
 async function loadAgentStats() {
@@ -326,24 +331,68 @@ function formatTokens(n) {
   return String(n);
 }
 
+let _activityIds = new Set();
+let _activityFilter = '';
+
 async function loadActivity() {
   const agent = document.getElementById('activityFilter').value;
+  const filterChanged = agent !== _activityFilter;
+  _activityFilter = agent;
   const q = agent ? `?agent=${agent}&limit=50` : '?limit=50';
-  try { const res = await fetch(`${API}/api/activity${q}`); renderActivity(await res.json()); } catch(e) { console.error(e); }
+  try {
+    const res = await fetch(`${API}/api/activity${q}`);
+    const items = await res.json();
+    if (filterChanged) { _activityIds.clear(); document.getElementById('activityFeed').innerHTML = ''; }
+    renderActivity(items, filterChanged);
+  } catch(e) { console.error(e); }
 }
 
-function renderActivity(items) {
+function activityItemHTML(a) {
+  const icons = { task_created:'📦', task_started:'🚀', task_completed:'✅', task_error:'❌', status_change:'🔄', comment_added:'💬', cron_run:'⏰' };
+  const icon = icons[a.action] || '📌';
+  const ag = agents.find(ag => ag.name === a.agent);
+  const agentName = ag ? ag.display_name : (a.agent || 'System');
+  const successBadge = a.success ? '' : '<span class="activity-badge badge-fail">Failed</span>';
+  const dur = a.duration ? `<span class="activity-badge badge-success">⏱ ${formatDuration(a.duration)}</span>` : '';
+  return `<div class="activity-item" data-activity-id="${a.id}"><div class="activity-icon">${icon}</div><div class="activity-content"><div class="activity-action">${esc(agentName)} — ${a.action.replace(/_/g,' ')}${successBadge}${dur}</div><div class="activity-details">${esc(a.details || '')}</div></div><div class="activity-time" data-time-ago="${a.created_at}">${timeAgo(a.created_at)}</div></div>`;
+}
+
+function renderActivity(items, fullReplace) {
   const el = document.getElementById('activityFeed');
-  if (!items.length) { el.innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px">No activity yet</p>'; return; }
-  const icons = { task_created:'📦', task_started:'🚀', task_completed:'✅', task_error:'❌', status_change:'🔄', comment_added:'💬' };
-  el.innerHTML = items.map(a => {
-    const icon = icons[a.action] || '📌';
-    const agent = agents.find(ag => ag.name === a.agent);
-    const agentName = agent ? agent.display_name : (a.agent || 'System');
-    const successBadge = a.success ? '' : '<span class="activity-badge badge-fail">Failed</span>';
-    const dur = a.duration ? `<span class="activity-badge badge-success">⏱ ${formatDuration(a.duration)}</span>` : '';
-    return `<div class="activity-item"><div class="activity-icon">${icon}</div><div class="activity-content"><div class="activity-action">${esc(agentName)} — ${a.action.replace(/_/g,' ')}${successBadge}${dur}</div><div class="activity-details">${esc(a.details || '')}</div></div><div class="activity-time">${timeAgo(a.created_at)}</div></div>`;
-  }).join('');
+  if (!items.length) { el.innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px">No activity yet</p>'; _activityIds.clear(); return; }
+
+  if (fullReplace || _activityIds.size === 0) {
+    // Full render
+    _activityIds = new Set(items.map(a => a.id));
+    el.innerHTML = items.map(activityItemHTML).join('');
+    return;
+  }
+
+  // Incremental: find new items not in our set
+  const newItems = items.filter(a => !_activityIds.has(a.id));
+  if (!newItems.length) return;
+
+  // Add new IDs
+  newItems.forEach(a => _activityIds.add(a.id));
+
+  // Prepend new items with animation
+  const fragment = document.createDocumentFragment();
+  newItems.reverse().forEach(a => {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = activityItemHTML(a);
+    const node = wrapper.firstElementChild;
+    node.classList.add('activity-new');
+    fragment.appendChild(node);
+  });
+  el.insertBefore(fragment, el.firstChild);
+
+  // Trigger animation after insert
+  requestAnimationFrame(() => {
+    el.querySelectorAll('.activity-new').forEach(n => {
+      n.offsetHeight; // force reflow
+      n.classList.remove('activity-new');
+    });
+  });
 }
 
 function switchTab(tab) {
