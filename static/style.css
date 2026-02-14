@@ -432,20 +432,20 @@ body{
 
 /* ── Responsive ─────────────────────────────────────────────── */
 @media(max-width:1024px){
-  html{height:100%;overflow:hidden}
-  body{height:100vh;overflow:hidden}
-  .page{overflow-y:auto;flex:1;min-height:0}
-  .page.active{display:flex;flex-direction:column;flex:1;min-height:0}
-  .layout{overflow:hidden;flex:1;min-height:0}
-  .main{overflow-y:auto;flex:1;min-height:0}
-  .kanban{grid-template-columns:repeat(2,1fr);flex:1;min-height:0}
-  .kanban-col{min-height:200px;max-height:100%;overflow:hidden}
-  .col-cards{max-height:none;overflow-y:auto;flex:1;min-height:0}
+  html{height:auto;min-height:100vh;overflow-y:auto;overflow-x:hidden}
+  body{height:auto;min-height:100vh;overflow-y:auto;overflow-x:hidden}
+  .page{overflow-y:visible;flex:none}
+  .page.active{display:flex;flex-direction:column;flex:none}
+  .layout{overflow:visible;flex:none}
+  .main{overflow-y:visible;flex:none}
+  .kanban{grid-template-columns:repeat(2,1fr);flex:none}
+  .kanban-col{min-height:200px}
+  .col-cards{max-height:400px;overflow-y:auto}
   .agent-cards-row{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
   .voice-features{grid-template-columns:1fr}
-  .sidebar{width:220px;min-width:220px;overflow-y:auto}
-  .tab-content.active{min-height:0;flex:1}
-  .scheduled-sections,.workspace-layout{min-height:0}
+  .sidebar{width:220px;min-width:220px;max-height:calc(100vh - 52px);overflow-y:auto;position:sticky;top:52px;align-self:flex-start}
+  .tab-content.active{min-height:auto;flex:none}
+  .scheduled-sections,.workspace-layout{min-height:auto}
 }
 @media(max-width:768px){
   .layout{flex-direction:column;height:auto}
