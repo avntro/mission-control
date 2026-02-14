@@ -83,6 +83,7 @@ body{
 .status-idle{background:rgba(0,188,212,.12);color:var(--accent)}
 .status-busy{background:rgba(255,171,64,.12);color:var(--orange)}
 .status-error{background:rgba(255,82,82,.12);color:var(--red)}
+.agent-meta-model{font-size:.68rem;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .agent-meta{font-size:.7rem;color:var(--muted);display:flex;flex-direction:column;gap:2px}
 
 /* ── Tabs ───────────────────────────────────────────────────── */

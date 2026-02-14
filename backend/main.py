@@ -1183,7 +1183,9 @@ def get_agent_stats():
         if not os.path.isdir(agent_dir):
             continue
         stats = _parse_session_stats(agent_dir)
-        ctx_limit = MODEL_CONTEXT_LIMITS.get(stats["model"], 200_000)
+        # Strip provider prefix for model lookup (e.g. "anthropic/claude-opus-4-6" -> "claude-opus-4-6")
+        model_key = stats["model"].split("/")[-1] if stats["model"] else ""
+        ctx_limit = MODEL_CONTEXT_LIMITS.get(model_key, 200_000)
         # Get the main session's tokens for context %
         main_session_tokens = 0
         for s in stats["sessions"]:

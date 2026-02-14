@@ -43,7 +43,8 @@ function tickTimers() {
   });
   // Tick "time ago" labels
   document.querySelectorAll('[data-time-ago]').forEach(el => {
-    el.textContent = timeAgo(el.dataset.timeAgo);
+    const prefix = el.dataset.timePrefix || '';
+    el.textContent = prefix + timeAgo(el.dataset.timeAgo);
   });
 }
 
@@ -148,6 +149,8 @@ function liveTaskCardHTML(t) {
   const activePulse = t.status === 'in_progress' ? ' live-pulse' : '';
   const modelStr = t.model ? t.model.replace('anthropic/', '').replace('claude-', 'c-') : '—';
   const costStr = t.cost != null && t.cost > 0 ? `$${t.cost.toFixed(2)}` : '—';
+  const timeRef = (t.status === 'done' || t.status === 'review') ? (t.completed_at || t.updated_at || t.created_at) : t.created_at;
+  const timeLabel = (t.status === 'done' || t.status === 'review') ? 'completed ' : '';
   return `<div class="task-card live-task${activePulse}" data-id="${t.id}">
     <div class="task-live-badge">${sourceIcon} LIVE</div>
     <div class="task-title">${esc(t.title)}</div>
@@ -155,7 +158,7 @@ function liveTaskCardHTML(t) {
       <span class="task-agent">${info.emoji} ${info.name}</span>
       ${tokens ? `<span class="task-tokens">🔤 ${tokens}</span>` : ''}
       ${t.status === 'in_progress' && t.created_at ? `<span class="task-duration" data-created-at="${t.created_at}" data-tick-duration>⏱ ${dur}</span>` : (dur ? `<span class="task-duration">⏱ ${dur}</span>` : '')}
-      <span class="task-time" data-time-ago="${t.created_at}">${timeAgo(t.created_at)}</span>
+      <span class="task-time" data-time-ago="${timeRef}" data-time-prefix="${timeLabel}">${timeLabel}${timeAgo(timeRef)}</span>
     </div>
     <div class="task-model-cost">${modelStr} · ${costStr}</div>
   </div>`;
@@ -173,12 +176,14 @@ function taskCardHTML(t) {
   }
   const tModelStr = t.model ? t.model.replace('anthropic/', '').replace('claude-', 'c-') : '—';
   const tCostStr = t.cost != null && t.cost > 0 ? `$${t.cost.toFixed(2)}` : '—';
+  const tTimeRef = (t.status === 'done' || t.status === 'review') ? (t.completed_at || t.updated_at || t.created_at) : t.created_at;
+  const tTimeLabel = (t.status === 'done' || t.status === 'review') ? 'completed ' : '';
   return `<div class="task-card" draggable="true" data-id="${t.id}" onclick="openDetail('${t.id}')">
     <div class="task-title">${esc(t.title)}</div>
     <div class="task-meta">
       <span class="task-agent">${esc(agentLabel)}</span>
       <span class="task-priority priority-${t.priority}">${t.priority}</span>
-      <span class="task-time" data-time-ago="${t.created_at}">${timeAgo(t.created_at)}</span>
+      <span class="task-time" data-time-ago="${tTimeRef}" data-time-prefix="${tTimeLabel}">${tTimeLabel}${timeAgo(tTimeRef)}</span>
       ${t.status === 'in_progress' && t.created_at ? `<span class="task-duration" data-created-at="${t.created_at}" data-tick-duration>⏱ ${dur}</span>` : (dur ? `<span class="task-duration">⏱ ${dur}</span>` : '')}
     </div>
     <div class="task-model-cost">${tModelStr} · ${tCostStr}</div>
@@ -213,14 +218,16 @@ function renderAgents() {
     const tokenStr = stats ? formatTokens(stats.main_session_tokens) + ' / ' + formatTokens(stats.context_limit) : '—';
     const ctxPct = stats ? stats.context_pct : 0;
     const ctxBarColor = ctxPct > 80 ? 'var(--red)' : ctxPct > 50 ? 'var(--orange)' : 'var(--green)';
-    const costStr = stats && stats.total_cost > 0 ? `$${stats.total_cost.toFixed(2)}` : '';
+    const costStr = stats && stats.total_cost > 0 ? `$${stats.total_cost.toFixed(2)}` : '—';
+    const modelStr = (stats && stats.model) ? stats.model.replace('anthropic/', '') : (a.model ? a.model.replace('anthropic/', '') : '—');
     const sessCount = stats ? stats.active_sessions : 0;
     const lastAct = a.last_activity ? timeAgo(a.last_activity) : 'No activity';
     return `<div class="agent-card">
       <div class="agent-top"><span class="agent-emoji">${a.emoji}</span><span class="agent-name">${esc(a.display_name)}</span><span class="agent-status status-${statusClass}">${statusLabel}</span></div>
       <div class="agent-token-row"><span class="agent-token-label">Context</span><span class="agent-token-value">${tokenStr}</span></div>
       <div class="agent-ctx-bar"><div class="agent-ctx-fill" style="width:${Math.min(ctxPct,100)}%;background:${ctxBarColor}"></div></div>
-      <div class="agent-meta"><span>${costStr ? '💰 '+costStr : esc(a.model)}</span><span ${a.last_activity ? `data-time-ago="${a.last_activity}"` : ''}>🕐 ${lastAct}</span></div>
+      <div class="agent-meta-model">🧠 ${esc(modelStr)}</div>
+      <div class="agent-meta"><span>💰 ${costStr}</span><span ${a.last_activity ? `data-time-ago="${a.last_activity}"` : ''}>🕐 ${lastAct}</span></div>
     </div>`;
   }).join('');
 }
