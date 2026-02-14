@@ -200,10 +200,19 @@ function renderBoard() {
   tasks.forEach(t => { const s = t.status in cols ? t.status : 'todo'; cols[s].push(t); });
   // Add live tasks (from session files)
   liveTasks.forEach(t => { const s = t.status in cols ? t.status : 'in_progress'; cols[s].push(t); });
+  const CARD_LIMIT = 8;
   for (const [status, items] of Object.entries(cols)) {
     const el = document.getElementById(`col-${status}`);
     if (el) {
-      el.innerHTML = items.map(t => t.is_live ? liveTaskCardHTML(t) : taskCardHTML(t)).join('');
+      const expanded = el.dataset.expanded === 'true';
+      const visible = expanded ? items : items.slice(0, CARD_LIMIT);
+      const hidden = items.length - visible.length;
+      el.innerHTML = visible.map(t => t.is_live ? liveTaskCardHTML(t) : taskCardHTML(t)).join('');
+      if (hidden > 0) {
+        el.innerHTML += `<button class="btn btn-sm" style="width:100%;margin-top:4px;text-align:center;color:var(--accent)" onclick="this.parentElement.dataset.expanded='true';renderBoard()">Show ${hidden} more…</button>`;
+      } else if (expanded && items.length > CARD_LIMIT) {
+        el.innerHTML += `<button class="btn btn-sm" style="width:100%;margin-top:4px;text-align:center;color:var(--accent)" onclick="this.parentElement.dataset.expanded='false';renderBoard()">Show less</button>`;
+      }
       document.getElementById(`count-${status}`).textContent = items.length;
     }
   }
@@ -308,7 +317,7 @@ function renderAgents() {
     const tokenStr = stats ? formatTokens(stats.main_session_tokens) + ' / ' + formatTokens(stats.context_limit) : '—';
     const ctxPct = stats ? stats.context_pct : 0;
     const ctxBarColor = ctxPct > 80 ? 'var(--red)' : ctxPct > 50 ? 'var(--orange)' : 'var(--green)';
-    const costStr = stats && stats.total_cost > 0 ? `$${stats.total_cost.toFixed(2)}` : '—';
+    const costStr = stats && stats.total_cost > 0 ? `$${stats.total_cost.toFixed(2)}` : '$0.00';
     const modelStr = (stats && stats.model) ? stats.model.replace('anthropic/', '') : (a.model ? a.model.replace('anthropic/', '') : '—');
     const sessCount = stats ? stats.active_sessions : 0;
     const lastAct = a.last_activity ? timeAgo(a.last_activity) : 'No activity';
@@ -553,9 +562,6 @@ function buildPremiumModal(t, isLive) {
 
   const isDone = t.status === 'done' || t.status === 'review';
   const isActive = t.status === 'in_progress';
-  const statusBadge = isActive
-    ? `<div class="premium-status-badge live">🔄 LIVE</div>`
-    : `<div class="premium-status-badge completed">✅ ${(t.status || 'done').replace('_',' ').toUpperCase()}</div>`;
 
   // Duration
   let dur = '—';
@@ -574,28 +580,34 @@ function buildPremiumModal(t, isLive) {
 
   let html = '';
 
-  // Status badge
-  html += statusBadge;
-
   // Agent block
   html += `<div class="premium-agent">
     <div class="premium-agent-icon" style="background:${agentColor}22;border:1px solid ${agentColor}44">${agentEmoji}</div>
     <div><div class="premium-agent-name">${esc(agentName)}</div><div class="premium-agent-role">${agentRole}</div></div>
   </div>`;
 
-  // 6-cell stats grid (2×3)
+  // 6-cell stats grid (2×3) with SVG icons
+  const svgClock = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+  const svgToken = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M6 12h12"/></svg>';
+  const svgCost = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>';
+  const svgModel = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M9 2v2M15 20v2M9 20v2M2 15h2M2 9h2M20 15h2M20 9h2"/></svg>';
+  const svgCalendar = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+  const svgElapsed = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/><path d="M22 12A10 10 0 003.2 7.2" opacity=".4"/></svg>';
+
   html += `<div class="premium-grid">
-    <div class="premium-stat"><div class="stat-icon">⏱</div><div class="stat-label">Duration</div><div class="stat-value">${dur}</div></div>
-    <div class="premium-stat"><div class="stat-icon">🟡</div><div class="stat-label">Tokens</div><div class="stat-value">${tokens}</div></div>
-    <div class="premium-stat"><div class="stat-icon">🔥</div><div class="stat-label">Est. Cost</div><div class="stat-value">${costStr}</div></div>
-    <div class="premium-stat"><div class="stat-icon">🖥️</div><div class="stat-label">Model</div><div class="stat-value" style="font-size:.76rem">${esc(modelStr)}</div></div>
-    <div class="premium-stat"><div class="stat-icon">📅</div><div class="stat-label">Started</div><div class="stat-value" style="font-size:.76rem">${startTime}</div></div>
-    <div class="premium-stat"><div class="stat-icon">🕐</div><div class="stat-label">Ago</div><div class="stat-value" data-time-ago="${t.created_at || ''}" data-time-prefix="">${startAgo}</div></div>
+    <div class="premium-stat"><div class="stat-icon" style="color:#00E676">${svgClock}</div><div class="stat-label">Duration</div><div class="stat-value">${dur}</div></div>
+    <div class="premium-stat"><div class="stat-icon" style="color:#ffab40">${svgToken}</div><div class="stat-label">Tokens</div><div class="stat-value">${tokens}</div></div>
+    <div class="premium-stat"><div class="stat-icon" style="color:#00bcd4">${svgCost}</div><div class="stat-label">Est. Cost</div><div class="stat-value">${costStr}</div></div>
+    <div class="premium-stat"><div class="stat-icon" style="color:#e040fb">${svgModel}</div><div class="stat-label">Model</div><div class="stat-value" style="font-size:.76rem">${esc(modelStr)}</div></div>
+    <div class="premium-stat"><div class="stat-icon" style="color:#6c63ff">${svgCalendar}</div><div class="stat-label">Started</div><div class="stat-value" style="font-size:.76rem">${startTime}</div></div>
+    <div class="premium-stat"><div class="stat-icon" style="color:#00bcd4">${svgElapsed}</div><div class="stat-label">Elapsed</div><div class="stat-value" data-time-ago="${t.created_at || ''}" data-time-prefix="">${startAgo}</div></div>
   </div>`;
 
-  // Session key
+  // Session key (truncated, click to copy)
   if (t.session_key || t.id) {
-    html += `<div class="premium-session">🔑 ${esc(t.session_key || t.id)}</div>`;
+    const fullKey = t.session_key || t.id;
+    const shortKey = fullKey.length > 32 ? fullKey.slice(0,16) + '…' + fullKey.slice(-8) : fullKey;
+    html += `<div class="premium-session" title="${esc(fullKey)}" onclick="navigator.clipboard.writeText('${esc(fullKey)}').then(()=>{this.textContent='✓ Copied!';setTimeout(()=>{this.textContent='🔑 ${esc(shortKey)}'},1500)})">🔑 ${esc(shortKey)}</div>`;
   }
 
   return html;
@@ -1609,4 +1621,4 @@ window.fetch = async function(...args) {
 
 function esc(s) { if (!s) return ''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function timeAgo(iso) { if (!iso) return ''; const diff = (Date.now() - new Date(iso).getTime()) / 1000; if (diff < 0) { const f = -diff; if (f < 60) return 'in <1m'; if (f < 3600) return `in ${Math.floor(f/60)}m`; if (f < 86400) return `in ${Math.floor(f/3600)}h`; return `in ${Math.floor(f/86400)}d`; } if (diff < 60) return 'just now'; if (diff < 3600) return `${Math.floor(diff/60)}m ago`; if (diff < 86400) return `${Math.floor(diff/3600)}h ago`; return `${Math.floor(diff/86400)}d ago`; }
-function formatDuration(secs) { if (!secs) return ''; if (secs < 60) return `${Math.round(secs)}s`; if (secs < 3600) return `${Math.floor(secs/60)}m ${Math.round(secs%60)}s`; return `${Math.floor(secs/3600)}h ${Math.floor((secs%3600)/60)}m`; }
+function formatDuration(secs) { if (!secs) return ''; secs = Math.round(secs); if (secs < 60) return `${secs}s`; if (secs < 3600) { const m = Math.floor(secs/60), s = secs%60; return s > 0 ? `${m}m ${s}s` : `${m}m`; } const h = Math.floor(secs/3600), m = Math.floor((secs%3600)/60); return m > 0 ? `${h}h ${m}m` : `${h}h`; }
