@@ -1398,13 +1398,26 @@ def get_agent_stats():
 
 
 @app.get("/api/live-tasks")
-def get_live_tasks():
-    """Extract real tasks from agent session files for the kanban board."""
+def get_live_tasks(agents: str = "main,dev"):
+    """Extract real tasks from agent session files for the kanban board.
+    
+    Args:
+        agents: Comma-separated list of agent names to include. Default: main,dev.
+                 Use 'all' to show all agents.
+    """
     agents_dir = os.path.join(OPENCLAW_HOME, "agents")
     tasks_list = []
     now_ms = int(time.time() * 1000)
+    
+    # Parse agent filter
+    agent_filter = None
+    if agents and agents.strip().lower() != "all":
+        agent_filter = set(a.strip().lower() for a in agents.split(",") if a.strip())
 
     for agent_name in os.listdir(agents_dir):
+        # Apply agent filter
+        if agent_filter and agent_name.lower() not in agent_filter:
+            continue
         agent_dir = os.path.join(agents_dir, agent_name)
         sessions_file = os.path.join(agent_dir, "sessions", "sessions.json")
         if not os.path.exists(sessions_file):

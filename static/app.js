@@ -9,6 +9,16 @@ let currentPage = 'dashboard';
 let workspaces = [];
 let orgExpanded = true;
 
+// Kanban agent filter
+function updateKanbanFilter(val) {
+  localStorage.setItem('kanbanAgents', val);
+  loadLiveTasks().then(() => renderBoard());
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const sel = document.getElementById('kanbanAgentFilter');
+  if (sel) sel.value = localStorage.getItem('kanbanAgents') || 'main,dev';
+});
+
 // Generate short display ID for tasks (e.g., "#A3F" from UUID)
 function shortId(id) {
   if (!id) return '#?';
@@ -145,7 +155,11 @@ async function loadAgentStats() {
 }
 
 async function loadLiveTasks() {
-  try { const res = await fetch(`${API}/api/live-tasks`); liveTasks = await res.json(); } catch(e) { console.error('Failed to load live tasks', e); }
+  try {
+    const kanbanAgents = localStorage.getItem('kanbanAgents') || 'main,dev';
+    const res = await fetch(`${API}/api/live-tasks?agents=${encodeURIComponent(kanbanAgents)}`);
+    liveTasks = await res.json();
+  } catch(e) { console.error('Failed to load live tasks', e); }
 }
 
 // ── Navigation ─────────────────────────────────────────────────
