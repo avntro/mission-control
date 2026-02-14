@@ -1318,6 +1318,7 @@ def get_live_tasks():
         for session_key, sess_info in sessions_data.items():
             sid = sess_info.get("sessionId", "")
             updated_at = sess_info.get("updatedAt", 0)
+            session_label = sess_info.get("label", "")
 
             # Skip main/mobile sessions — they're not discrete tasks
             # Focus on subagent, cron, and control sessions
@@ -1387,13 +1388,80 @@ def get_live_tasks():
             except OSError:
                 continue
 
-            if not title:
+            if not title and not session_label:
                 continue
 
-            # Clean up title: remove [cron:...] and [date] prefixes, take first line
-            clean_title = re.sub(r'\[cron:[^\]]+\]\s*', '', title)
-            clean_title = re.sub(r'\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+GMT[^\]]*\]\s*', '', clean_title)
-            clean_title = clean_title.split('\n')[0][:150]
+            # Build full description (for modal)
+            full_description = title or ""
+
+            # Clean up raw title: remove [cron:...] and [date] prefixes
+            raw_title = re.sub(r'\[cron:[^\]]+\]\s*', '', title)
+            raw_title = re.sub(r'\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+GMT[^\]]*\]\s*', '', raw_title).strip()
+
+            # Smart title selection: label > extracted short title > agent name
+            def make_smart_title(raw: str, label: str, key: str) -> str:
+                """Pick the best short title for a kanban card."""
+                # 1. If session has a label, capitalize and use it
+                if label:
+                    t = label.strip().replace('-', ' ').replace('_', ' ')
+                    return t[:60].title() if t == t.lower() else t[:60]
+
+                if not raw:
+                    parts = key.split(':')
+                    agent = parts[1] if len(parts) > 1 else 'unknown'
+                    kind = parts[2] if len(parts) > 2 else 'task'
+                    return f"{agent.title()} {kind.title()}"
+
+                # 2. Search for **bold title** anywhere in text (common pattern)
+                # Find ALL bold matches, pick the best one (skip short labels like "Issue:" or "Task:")
+                bold_matches = re.findall(r'\*\*(.+?)\*\*', raw[:500])
+                for candidate in bold_matches:
+                    candidate = candidate.strip().rstrip(':')
+                    # Skip generic labels that aren't descriptive
+                    if len(candidate) < 8 and candidate.lower() in ('issue', 'task', 'bug', 'fix', 'note', 'todo', 'goal'):
+                        # Try combining label with text after **label:** 
+                        label_match = re.search(r'\*\*' + re.escape(candidate) + r':?\*\*\s*(.+?)(?:\n|$)', raw[:500])
+                        if label_match:
+                            after = label_match.group(1).strip()
+                            combined = f"{candidate}: {after}"
+                            if len(combined) <= 60:
+                                return combined
+                            return _truncate(combined)
+                        continue
+                    if 5 < len(candidate) <= 60:
+                        return candidate
+                    if len(candidate) > 60:
+                        return _truncate(candidate)
+
+                # 3. Look for markdown headers
+                header_match = re.search(r'^#+\s+(.+)', raw[:500], re.MULTILINE)
+                if header_match:
+                    candidate = header_match.group(1).strip()
+                    if len(candidate) <= 60:
+                        return candidate
+                    return _truncate(candidate)
+
+                # 4. Take first meaningful line (skip lines with paths/URLs)
+                for line in raw.split('\n')[:5]:
+                    line = line.strip()
+                    if not line or line.startswith('http') or line.startswith('/'):
+                        continue
+                    if len(line) <= 60:
+                        return line
+                    return _truncate(line)
+
+                return _truncate(raw.split('\n')[0].strip())
+
+            def _truncate(s: str, max_len: int = 57) -> str:
+                if len(s) <= max_len + 3:
+                    return s
+                t = s[:max_len]
+                last_space = t.rfind(' ')
+                if last_space > 25:
+                    return t[:last_space] + '...'
+                return t + '...'
+
+            clean_title = make_smart_title(raw_title, session_label, session_key)
 
             # Determine kanban status
             # Check for deleted sessions (completed)
@@ -1440,6 +1508,7 @@ def get_live_tasks():
             tasks_list.append({
                 "id": f"live-{sid[:8]}",
                 "title": clean_title,
+                "description": full_description[:1000],
                 "assigned_agent": agent_name,
                 "status": status,
                 "priority": "medium",

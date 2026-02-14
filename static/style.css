@@ -400,23 +400,34 @@ body{
   .kanban{grid-template-columns:repeat(2,1fr)}
   .agent-cards-row{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
   .voice-features{grid-template-columns:1fr}
+  .sidebar{width:220px;min-width:220px}
 }
 @media(max-width:768px){
   .layout{flex-direction:column;height:auto}
-  .sidebar{width:100%;min-width:100%;border-right:none;border-bottom:1px solid var(--border);max-height:200px}
+  .sidebar{width:100%;min-width:100%;border-right:none;border-bottom:1px solid var(--border);max-height:180px;overflow-y:hidden;overflow-x:auto;padding:10px}
   .sidebar h2{display:none}
-  #agentsList{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px}
-  .agent-card{min-width:180px}
+  #systemWidget,#gpuWidget{display:none}
+  .sidebar .gpu-widget{display:none}
+  #agentsList{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory}
+  .agent-card{min-width:160px;max-width:160px;flex-shrink:0;scroll-snap-align:start;font-size:.78rem}
+  .agent-card .agent-name{font-size:.8rem}
+  .agent-card .agent-token-row,.agent-card .agent-meta-model,.agent-card .agent-meta{font-size:.65rem}
+  .agent-card .agent-token-value{font-size:.65rem}
   .kanban{grid-template-columns:1fr}
   .topnav{flex-wrap:wrap;height:auto;padding:8px 12px}
-  .topnav-tabs{order:3;width:100%;overflow-x:auto;padding-top:4px}
-  .nav-tab{font-size:.75rem;padding:6px 10px}
+  .topnav-left{margin-right:8px}
+  .topnav-right{order:2;margin-left:auto}
+  .topnav-tabs{order:3;width:100%;overflow-x:auto;padding-top:4px;-webkit-overflow-scrolling:touch}
+  .nav-tab{font-size:.75rem;padding:6px 10px;flex-shrink:0}
   .stats-bar{flex-direction:column}
   .workspace-layout{flex-direction:column;height:auto}
   .ws-sidebar{width:100%;min-width:100%;max-height:200px;border-right:none;border-bottom:1px solid var(--border)}
   .org-level{flex-direction:column;align-items:center}
   .webcam-overlay{width:70px;height:52px}
   .webcam-placeholder span{font-size:.9rem}
+  .modal{max-width:95vw;max-height:90vh}
+  .modal.premium-detail{max-width:95vw}
+  .premium-grid{grid-template-columns:repeat(2,1fr)}
 }
 @media(max-width:480px){
   .topnav-left{margin-right:8px}
