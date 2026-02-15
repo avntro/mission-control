@@ -1,5 +1,6 @@
 // Mission Control — Phase 3 Frontend
 const API = '';
+function pluralSub(n) { return n === 1 ? 'sub-agent' : 'sub-agents'; }
 let tasks = [];
 let agents = [];
 let agentStats = [];
@@ -374,7 +375,7 @@ function renderAgents() {
       <div class="agent-ctx-bar"><div class="agent-ctx-fill" style="width:${Math.min(d.ctxPct,100)}%;background:${d.ctxBarColor}"></div></div>
       <div class="agent-meta-model">🧠 ${esc(d.modelStr)}</div>
       ${d.liveCreatedAt ? `<div class="agent-meta"><span data-created-at="${d.liveCreatedAt}" data-tick-duration>⏱ ${d.liveDur}</span><span>📊 ${d.sessCount} sessions</span></div>` : ''}
-      ${d.subagentCount > 0 ? `<div class="agent-meta agent-subagent-row" onclick="openSubagentPanel('${d.name}',event)"><span>🔀 ${d.activeSubagents > 0 ? d.activeSubagents + ' active / ' : ''}${d.subagentCount} sub-agents</span></div>` : ''}
+      ${d.subagentCount > 0 ? `<div class="agent-meta agent-subagent-row" onclick="openSubagentPanel('${d.name}',event)"><span>🔀 ${d.activeSubagents > 0 ? d.activeSubagents + ' active / ' : ''}${d.subagentCount} ${pluralSub(d.subagentCount)}</span></div>` : ''}
       <div class="agent-meta"><span>💰 ${d.costStr}</span><span ${d.lastActivity ? `data-time-ago="${d.lastActivity}" data-time-prefix="🕐 "` : ''}>🕐 ${d.lastAct}</span></div>
     </div>`).join('');
     return;
@@ -922,7 +923,7 @@ async function loadTaskManager() {
     <div class="agent-ctx-row"><span>Context: ${tokenStr}</span><span style="color:${ctxColor}">${ctxPct}%</span></div>
     <div class="agent-ctx-bar-lg"><div class="agent-ctx-fill" style="width:${Math.min(ctxPct,100)}%;background:${ctxColor}"></div></div>
     <div class="agent-card-lg-stats"><div class="agent-stat"><span class="num">${sessCount}</span><span class="lbl">Sessions</span></div><div class="agent-stat"><span class="num">${activeSess}</span><span class="lbl">Active</span></div><div class="agent-stat"><span class="num">${costStr}</span><span class="lbl">Cost</span></div></div>
-    ${stats && stats.subagent_count > 0 ? `<div class="agent-subagent-badge" onclick="event.stopPropagation();openSubagentPanel('${a.name}',event)">🔀 ${stats.active_subagents > 0 ? stats.active_subagents + ' active / ' : ''}${stats.subagent_count} sub-agents</div>` : ''}</div>`;
+    ${stats && stats.subagent_count > 0 ? `<div class="agent-subagent-badge" onclick="event.stopPropagation();openSubagentPanel('${a.name}',event)">🔀 ${stats.active_subagents > 0 ? stats.active_subagents + ' active / ' : ''}${stats.subagent_count} ${pluralSub(stats.subagent_count)}</div>` : ''}</div>`;
   }).join('');
 }
 
@@ -966,9 +967,9 @@ function renderOrgChart() {
   tree.innerHTML = `
     <div class="org-level"><div class="org-node" onclick="toggleOrgChildren('mike-children')"><div class="org-node-avatar">👤</div><div class="org-node-name">Argyris</div><div class="org-node-role">Owner · CEO · Vision & Strategy</div><div class="org-node-status">${statusDot('idle')} <span style="color:var(--green)">Online</span></div></div></div>
     <div style="display:flex;justify-content:center"><div style="width:2px;height:30px;background:var(--border-hover)"></div></div>
-    <div class="org-level"><div class="org-node" onclick="toggleOrgChildren('agent-children')"><div class="org-node-avatar">🎯</div><div class="org-node-name">Mike</div><div class="org-node-role">COO · Facilitator · Task Delegation</div><div class="org-node-model">anthropic/claude-opus-4-6</div>${(() => { const ms = agentStats.find(s => s.name === 'main'); return ms && ms.subagent_count > 0 ? `<div class="org-node-subagents" onclick="event.stopPropagation();openSubagentPanel('main',event)">🔀 ${ms.active_subagents > 0 ? ms.active_subagents + ' active / ' : ''}${ms.subagent_count} sub-agents</div>` : ''; })()}<div class="org-node-status">${statusDot(getStatus('main'))} <span>${getStatus('main')}</span></div></div></div>
+    <div class="org-level"><div class="org-node" onclick="toggleOrgChildren('agent-children')"><div class="org-node-avatar">🎯</div><div class="org-node-name">Mike</div><div class="org-node-role">COO · Facilitator · Task Delegation</div><div class="org-node-model">anthropic/claude-opus-4-6</div>${(() => { const ms = agentStats.find(s => s.name === 'main'); return ms && ms.subagent_count > 0 ? `<div class="org-node-subagents" onclick="event.stopPropagation();openSubagentPanel('main',event)">🔀 ${ms.active_subagents > 0 ? ms.active_subagents + ' active / ' : ''}${ms.subagent_count} ${pluralSub(ms.subagent_count)}</div>` : ''; })()}<div class="org-node-status">${statusDot(getStatus('main'))} <span>${getStatus('main')}</span></div></div></div>
     <div style="display:flex;justify-content:center"><div style="width:2px;height:30px;background:var(--border-hover)"></div></div>
-    <div class="org-children ${collapsed}" id="agent-children">${childAgents.map(a => `<div class="org-connector"><div class="org-node"><div class="org-node-avatar">${a.emoji}</div><div class="org-node-name">${a.name}</div><div class="org-node-role">${a.role}</div><div class="org-node-model">${a.model}</div>${a.subagentCount > 0 ? `<div class="org-node-subagents" onclick="event.stopPropagation();openSubagentPanel('${a.id}',event)">🔀 ${a.activeSubagents > 0 ? a.activeSubagents + ' active / ' : ''}${a.subagentCount} sub-agents</div>` : ''}<div class="org-node-status">${statusDot(getStatus(a.id))} <span>${getStatus(a.id)}</span></div></div></div>`).join('')}</div>`;
+    <div class="org-children ${collapsed}" id="agent-children">${childAgents.map(a => `<div class="org-connector"><div class="org-node"><div class="org-node-avatar">${a.emoji}</div><div class="org-node-name">${a.name}</div><div class="org-node-role">${a.role}</div><div class="org-node-model">${a.model}</div>${a.subagentCount > 0 ? `<div class="org-node-subagents" onclick="event.stopPropagation();openSubagentPanel('${a.id}',event)">🔀 ${a.activeSubagents > 0 ? a.activeSubagents + ' active / ' : ''}${a.subagentCount} ${pluralSub(a.subagentCount)}</div>` : ''}<div class="org-node-status">${statusDot(getStatus(a.id))} <span>${getStatus(a.id)}</span></div></div></div>`).join('')}</div>`;
 }
 
 function toggleOrgChildren(id) { const el = document.getElementById(id); if (el) el.classList.toggle('collapsed'); }

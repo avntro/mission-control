@@ -501,13 +501,15 @@ body{
   .org-node{min-width:140px;max-width:200px;padding:12px 14px}
   .org-tree{padding:10px 0 40px}
   .org-level{margin-bottom:20px}
-  /* Workspace layout on tablet */
-  .workspace-layout{flex-direction:column;height:auto}
-  .ws-sidebar{width:100%!important;min-width:100%!important;max-height:250px;overflow-y:auto;border-right:none;border-bottom:1px solid var(--border)}
+  /* Workspace layout on tablet - keep side-by-side */
+  .workspace-layout{flex-direction:row;height:auto;min-height:500px}
+  .ws-sidebar{width:240px!important;min-width:240px!important;max-height:none;overflow-y:auto;border-right:1px solid var(--border);border-bottom:none}
   /* Job descriptions — allow wrapping */
   .job-desc{white-space:normal;word-break:break-word;max-width:100%}
   .job-info{min-width:0;overflow:hidden}
   .job-row{flex-wrap:wrap}
+  /* Overnight log - limit height with scroll */
+  #overnightLog{max-height:400px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(0,188,212,0.4) transparent}
   /* Activity feed touch optimization */
   .activity-item{padding:16px 12px}
   /* Premium grid on tablet */
@@ -770,17 +772,7 @@ body{
   }
 }
 
-/* FIX 3: Kanban - Keep 4-column horizontal on tablet (1080px+), only go 2-column on smaller screens */
-@media (max-width: 1200px) and (min-width: 900px) {
-  .kanban {
-    grid-template-columns: repeat(4, 1fr) !important;
-  }
-}
-@media (max-width: 899px) and (min-width: 769px) {
-  .kanban {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-}
+/* FIX 3: Kanban columns handled in FIX 41 below */
 
 /* FIX 4: Empty State Improvements */
 .col-empty {
@@ -1089,38 +1081,7 @@ body{
   line-height: 1.5;
 }
 
-/* FIX 8: Kanban Layout - 4-column horizontal on 1080px tablet, 2-column on smaller screens */
-@media (max-width: 1200px) and (min-width: 900px) {
-  .kanban {
-    grid-template-columns: repeat(4, 1fr) !important;
-    gap: 10px;
-  }
-  
-  .kanban-col {
-    min-height: 200px;
-  }
-  
-  /* Make page scrollable on tablet */
-  html {
-    height: auto !important;
-    min-height: 100vh !important;
-    overflow-y: scroll !important;
-  }
-  
-  body {
-    height: auto !important;
-    min-height: 100vh !important;
-    overflow: visible !important;
-  }
-}
-
-/* Kanban: 2-column layout for medium tablets (769-899px) */
-@media (max-width: 899px) and (min-width: 769px) {
-  .kanban {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 10px;
-  }
-}
+/* FIX 8: Kanban layout handled in FIX 41 */
 
 /* FIX 9: Sidebar Widgets - Ensure Visible on All Viewports */
 #systemWidget,
@@ -1560,16 +1521,16 @@ body{
 /* Target: 1080x1024 tablet viewport issues                     */
 /* ══════════════════════════════════════════════════════════════ */
 
-/* FIX 41: Kanban - 2x2 Grid at Tablet Breakpoint (1080-1200px) */
+/* FIX 41: Kanban - 4 columns at tablet (1080px+), 2 columns on smaller */
 @media (max-width: 1200px) and (min-width: 769px) {
   .kanban {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 12px;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 8px;
     min-height: auto !important;
   }
   
   .kanban-col {
-    min-height: 300px;
+    min-height: 200px;
   }
   
   .col-cards {
