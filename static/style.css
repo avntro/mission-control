@@ -39,8 +39,11 @@ body{
 .topnav-left{display:flex;align-items:center;gap:10px;margin-right:24px}
 .logo{font-size:1.3rem;filter:drop-shadow(0 0 6px rgba(255,215,0,0.4))}
 .brand{font-size:1.05rem;font-weight:700;letter-spacing:-0.3px;white-space:nowrap;background:linear-gradient(135deg,var(--gold),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.topnav-tabs{display:flex;gap:2px;flex:1;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none;mask-image:linear-gradient(to right,#000 90%,transparent);-webkit-mask-image:linear-gradient(to right,#000 90%,transparent)}
-.topnav-tabs::-webkit-scrollbar{display:none}
+.topnav-tabs{display:flex;gap:2px;flex:1;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:rgba(0,188,212,0.3) transparent}
+.topnav-tabs::-webkit-scrollbar{height:3px}
+.topnav-tabs::-webkit-scrollbar-track{background:transparent}
+.topnav-tabs::-webkit-scrollbar-thumb{background:rgba(0,188,212,0.3);border-radius:2px}
+.topnav-tabs::-webkit-scrollbar-thumb:hover{background:rgba(0,188,212,0.5)}
 .topnav-tabs:hover,.topnav-tabs:focus-within{mask-image:none;-webkit-mask-image:none}
 .topnav-tabs.has-overflow-right::after{content:'›';position:sticky;right:0;padding:0 4px;color:var(--accent);font-size:1.2rem;font-weight:700;opacity:.7;pointer-events:none;background:linear-gradient(to right,transparent,var(--surface) 40%)}
 .topnav-tabs.has-overflow-left::before{content:'‹';position:sticky;left:0;padding:0 4px;color:var(--accent);font-size:1.2rem;font-weight:700;opacity:.7;pointer-events:none;background:linear-gradient(to left,transparent,var(--surface) 40%)}
@@ -477,9 +480,12 @@ body{
   .sidebar{width:100%!important;min-width:100%!important;border-right:none;border-bottom:1px solid var(--border);max-height:none!important;overflow-y:visible!important;-webkit-overflow-scrolling:touch!important;position:relative;padding:10px}
   .sidebar h2{display:inline-block;font-size:.75rem;margin-bottom:8px;margin-right:12px}
   .sidebar h2:nth-of-type(2),.sidebar h2:nth-of-type(3){font-size:.7rem;margin-top:10px}
-  #agentsList{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;mask-image:linear-gradient(to right,#000 90%,transparent);-webkit-mask-image:linear-gradient(to right,#000 90%,transparent)}
-  #agentsList:hover{mask-image:none;-webkit-mask-image:none}
-  .agent-card{min-width:220px;max-width:240px;flex-shrink:0}
+  #agentsList{display:flex;gap:8px;overflow-x:auto;padding-bottom:12px;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;scrollbar-width:thin;scrollbar-color:rgba(0,188,212,0.5) rgba(0,0,0,0.2)}
+  #agentsList::-webkit-scrollbar{height:6px}
+  #agentsList::-webkit-scrollbar-track{background:rgba(0,0,0,0.2);border-radius:3px}
+  #agentsList::-webkit-scrollbar-thumb{background:rgba(0,188,212,0.5);border-radius:3px}
+  #agentsList::-webkit-scrollbar-thumb:hover{background:rgba(0,188,212,0.7)}
+  .agent-card{min-width:190px;max-width:200px;flex-shrink:0}
   .tab-content.active{min-height:auto;flex:none}
   .scheduled-sections,.workspace-layout{min-height:auto}
   /* Nav tabs compact */
@@ -522,8 +528,8 @@ body{
   .sidebar-widgets{display:flex;gap:8px}
   .sidebar-widget-col{flex:1;min-width:0}
   .sidebar-widget-col h2{margin-top:8px!important;font-size:.65rem}
-  #agentsList{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;mask-image:linear-gradient(to right,#000 85%,transparent);-webkit-mask-image:linear-gradient(to right,#000 85%,transparent)}
-  #agentsList:hover{mask-image:none;-webkit-mask-image:none}
+  #agentsList{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory}
+  
   .agent-card{min-width:160px;max-width:160px;flex-shrink:0;scroll-snap-align:start;font-size:.78rem}
   .agent-card .agent-name{font-size:.8rem}
   .agent-card .agent-token-row,.agent-card .agent-meta-model,.agent-card .agent-meta{font-size:.65rem}
