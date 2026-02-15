@@ -729,3 +729,144 @@ body{
   margin-right: 4px;
   vertical-align: middle;
 }
+/* ══════════════════════════════════════════════════════════════ */
+/* Mission Control - Minimal Targeted Fixes (2026-02-15)        */
+/* ══════════════════════════════════════════════════════════════ */
+
+/* FIX 1: Text Contrast - Strengthen muted text globally */
+:root {
+  --text: #f0f0f0;
+  --muted: #aaa;
+}
+
+/* FIX 2: Agent Cards Horizontal Scroll Indicator (Tablet 1080px) */
+@media (max-width: 1200px) {
+  #agentsList {
+    position: relative;
+    padding-right: 50px;
+  }
+  
+  #agentsList::after {
+    content: '→';
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 188, 212, 0.85);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    pointer-events: none;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+  }
+}
+
+/* FIX 3: Kanban - Keep 2x2 grid on tablet (DO NOT change to single column) */
+@media (max-width: 1200px) {
+  .kanban {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* FIX 4: Empty State Improvements */
+.col-empty {
+  color: #999 !important;
+  font-size: 0.82rem;
+}
+
+/* FIX 5: Column Count Badge Visibility */
+.col-count {
+  background: rgba(0, 188, 212, 0.15);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* FIX 6: Active Tab Visibility */
+.tab.active {
+  background: rgba(0, 188, 212, 0.12);
+  color: #fff;
+  font-weight: 700;
+  border-bottom: 3px solid var(--accent);
+}
+
+.tab:not(.active) {
+  color: #999;
+}
+
+/* FIX 7: Page Header */
+.page-header h2 {
+  color: #fff !important;
+}
+
+/* FIX 8: GPU/System Widget Error States */
+.gpu-error {
+  color: #ff8888;
+  font-weight: 600;
+}
+
+.gpu-loading {
+  color: #999;
+}
+
+/* FIX 9: Agent Status Badge Contrast */
+.status-idle {
+  background: rgba(0, 188, 212, 0.18);
+  color: #00e5ff;
+}
+
+.status-busy {
+  background: rgba(255, 171, 64, 0.18);
+  color: #ffcc73;
+}
+
+/* FIX 10: Sidebar Scrollbar Visibility */
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(0, 188, 212, 0.25);
+}
+
+.sidebar:hover::-webkit-scrollbar-thumb {
+  background: rgba(0, 188, 212, 0.4);
+}
+/* ══════════════════════════════════════════════════════════════ */
+/* Final Polish - Text Contrast Fixes (2026-02-15)              */
+/* ══════════════════════════════════════════════════════════════ */
+
+/* Dashboard & Section Headers - Brighten */
+.page-header h2,
+.sidebar h2,
+.ws-section-title,
+.section-title {
+  color: #ddd !important;
+}
+
+/* Empty State Text - Improve Visibility */
+.col-empty {
+  color: #aaa !important;
+  opacity: 0.9 !important;
+}
+
+/* Loading State Text - Improve Visibility */
+.gpu-loading {
+  color: #aaa !important;
+}
+
+/* Agent Meta Text - Final Boost */
+.agent-meta,
+.agent-meta span {
+  color: #bbb !important;
+}
+
+/* Task Metadata - Final Boost */
+.task-time,
+.task-tokens,
+.task-model-cost {
+  color: #bbb !important;
+}
+
+/* Top Nav Status - Brighten */
+.topnav-right {
+  color: #ddd !important;
+}

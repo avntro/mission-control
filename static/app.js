@@ -1377,13 +1377,37 @@ function searchDocs() {
 // SYSTEM STATS
 // ══════════════════════════════════════════════════════════════
 
+let systemStatsTimeout = null;
 async function loadSystemStats() {
   try {
-    const res = await fetch(`${API}/api/system?_=${Date.now()}`);
+    // Clear any existing timeout
+    if (systemStatsTimeout) clearTimeout(systemStatsTimeout);
+    
+    // Set timeout for error state after 8 seconds
+    systemStatsTimeout = setTimeout(() => {
+      const el = document.getElementById('systemWidget');
+      if (el && el.innerHTML.includes('Loading')) {
+        el.innerHTML = '<div class="gpu-error">Stats timeout</div>';
+      }
+    }, 8000);
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 7000);
+    
+    const res = await fetch(`${API}/api/system?_=${Date.now()}`, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    clearTimeout(systemStatsTimeout);
+    
     if (!res.ok) throw new Error('System stats unavailable');
     const s = await res.json();
     renderSystemWidget(s);
-  } catch(e) { document.getElementById('systemWidget').innerHTML = '<div class="gpu-loading">System stats offline</div>'; }
+  } catch(e) { 
+    if (systemStatsTimeout) clearTimeout(systemStatsTimeout);
+    const el = document.getElementById('systemWidget');
+    if (el) {
+      el.innerHTML = '<div class="gpu-error">Stats unavailable</div>'; 
+    }
+  }
 }
 
 function formatBytes(bytes) {
@@ -1460,15 +1484,39 @@ document.addEventListener('DOMContentLoaded', () => setTimeout(loadSystemStats, 
 const gpuHistory = [];
 const GPU_HISTORY_MAX = 60;
 
+let gpuStatsTimeout = null;
 async function loadGpuStats() {
   try {
-    const res = await fetch(`${API}/api/gpu?_=${Date.now()}`);
+    // Clear any existing timeout
+    if (gpuStatsTimeout) clearTimeout(gpuStatsTimeout);
+    
+    // Set timeout for error state after 8 seconds
+    gpuStatsTimeout = setTimeout(() => {
+      const el = document.getElementById('gpuWidget');
+      if (el && el.innerHTML.includes('Loading')) {
+        el.innerHTML = '<div class="gpu-error">GPU timeout</div>';
+      }
+    }, 8000);
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 7000);
+    
+    const res = await fetch(`${API}/api/gpu?_=${Date.now()}`, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    clearTimeout(gpuStatsTimeout);
+    
     if (!res.ok) throw new Error('GPU unavailable');
     const g = await res.json();
     gpuHistory.push(g.gpu_use);
     if (gpuHistory.length > GPU_HISTORY_MAX) gpuHistory.shift();
     renderGpuWidget(g);
-  } catch(e) { document.getElementById('gpuWidget').innerHTML = '<div class="gpu-loading">GPU offline</div>'; }
+  } catch(e) { 
+    if (gpuStatsTimeout) clearTimeout(gpuStatsTimeout);
+    const el = document.getElementById('gpuWidget');
+    if (el) {
+      el.innerHTML = '<div class="gpu-error">GPU unavailable</div>'; 
+    }
+  }
 }
 
 function renderGpuWidget(g) {
