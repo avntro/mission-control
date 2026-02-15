@@ -2,7 +2,7 @@
 :root{
   --bg:#1a1a1a;--surface:#222;--card:#2a2a2a;--card-hover:#333;
   --border:rgba(255,255,255,0.08);--border-hover:rgba(255,255,255,0.15);
-  --text:#e8e8e8;--muted:#aaa;--accent:#00bcd4;--accent-hover:#00d4ef;
+  --text:#e8e8e8;--muted:#999;--accent:#00bcd4;--accent-hover:#00d4ef;
   --green:#00E676;--orange:#ffab40;--red:#ff5252;--pink:#e040fb;--blue:#00b0ff;
   --purple:#6c63ff;
   --gold:#ffd700;--neon-border:rgba(0,188,212,0.3);
@@ -85,7 +85,7 @@ body{
 .agent-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;overflow:hidden;min-width:0}
 .agent-emoji{font-size:1.2rem}
 .agent-name{font-weight:600;font-size:.86rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.agent-status{font-size:.64rem;padding:3px 9px;border-radius:10px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;flex-shrink:0;max-width:70px;overflow:visible}
+.agent-status{font-size:.62rem;padding:3px 8px;border-radius:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;flex-shrink:0;max-width:60px;overflow:hidden;text-overflow:ellipsis}
 .status-idle{background:rgba(0,188,212,.12);color:var(--accent)}
 .status-busy{background:rgba(255,171,64,.12);color:var(--orange)}
 .status-error{background:rgba(255,82,82,.12);color:var(--red)}
@@ -111,7 +111,7 @@ body{
 .col-cards{flex:1;display:flex;flex-direction:column;gap:8px;min-height:60px;transition:background .15s;border-radius:var(--radius);padding:4px;overflow-y:auto;position:relative}
 .col-cards:not(:empty)::after{content:'';position:sticky;bottom:0;left:0;right:0;height:24px;background:linear-gradient(transparent,var(--surface));pointer-events:none;flex-shrink:0}
 .col-cards.drag-over{background:rgba(0,188,212,.06);outline:2px dashed rgba(0,188,212,.3);outline-offset:-2px}
-.col-empty{text-align:center;padding:24px 12px;color:var(--muted);font-size:.82rem;opacity:.8}
+.col-empty{text-align:center;padding:24px 12px;color:var(--muted);font-size:.78rem;opacity:.6}
 
 /* ── Task Cards ─────────────────────────────────────────────── */
 .task-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;cursor:grab;transition:all .15s;position:relative}
@@ -448,7 +448,7 @@ body{
 
 /* ── GPU Widget ─────────────────────────────────────────────── */
 .gpu-widget{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px}
-.gpu-loading{text-align:center;color:var(--text);font-size:.82rem;padding:12px;opacity:.7}
+.gpu-loading{text-align:center;color:var(--muted);font-size:.78rem;padding:12px}
 .gpu-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:.78rem}
 .gpu-label{color:var(--muted)}
 .gpu-value{font-weight:600;font-variant-numeric:tabular-nums}
@@ -468,22 +468,22 @@ body{
   .page.active{display:flex;flex-direction:column;flex:none}
   .layout{overflow:visible!important;flex:none!important}
   .main{overflow-y:visible!important;flex:none!important;height:auto!important;padding-left:0!important}
-  .kanban{grid-template-columns:repeat(4,1fr);flex:none;min-height:auto!important;overflow:visible!important}
+  .kanban{grid-template-columns:repeat(2,1fr);flex:none;min-height:auto!important;overflow:visible!important}
   .kanban-col{min-height:auto}
   .col-cards{max-height:none!important;overflow-y:visible!important}
   .agent-cards-row{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
   .voice-features{grid-template-columns:1fr}
   .layout{flex-direction:column!important;height:auto!important}
-  .sidebar{width:100%!important;min-width:100%!important;border-right:none;border-bottom:1px solid var(--border);max-height:none!important;overflow-y:visible!important;-webkit-overflow-scrolling:touch!important;position:relative;padding:10px}
+  .sidebar{width:100%!important;min-width:100%!important;border-right:none;border-bottom:1px solid var(--border);max-height:calc(100vh - 60px)!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;position:relative;padding:10px}
   .sidebar h2{display:inline-block;font-size:.75rem;margin-bottom:8px;margin-right:12px}
   .sidebar h2:nth-of-type(2),.sidebar h2:nth-of-type(3){font-size:.7rem;margin-top:10px}
   #agentsList{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;mask-image:linear-gradient(to right,#000 90%,transparent);-webkit-mask-image:linear-gradient(to right,#000 90%,transparent)}
   #agentsList:hover{mask-image:none;-webkit-mask-image:none}
-  .agent-card{min-width:220px;max-width:240px;flex-shrink:0}
+  .agent-card{min-width:200px;max-width:220px;flex-shrink:0}
   .tab-content.active{min-height:auto;flex:none}
   .scheduled-sections,.workspace-layout{min-height:auto}
   /* Nav tabs compact */
-  .nav-tab{padding:7px 10px;font-size:.76rem;white-space:nowrap}
+  .nav-tab{padding:6px 6px;font-size:.72rem}
   /* Stats bar fix — ensure visible with proper padding */
   .stats-bar{flex-wrap:wrap;gap:8px;margin-bottom:16px;padding-top:0}
   .stat-card{min-width:120px;padding:12px 14px;flex:1 1 calc(33% - 8px)}
@@ -764,13 +764,8 @@ body{
   }
 }
 
-/* FIX 3: Kanban - Keep 4-column horizontal on tablet (1080px+), only go 2-column on smaller screens */
-@media (max-width: 1200px) and (min-width: 900px) {
-  .kanban {
-    grid-template-columns: repeat(4, 1fr) !important;
-  }
-}
-@media (max-width: 899px) and (min-width: 769px) {
+/* FIX 3: Kanban - Keep 2x2 grid on tablet (DO NOT change to single column) */
+@media (max-width: 1200px) {
   .kanban {
     grid-template-columns: repeat(2, 1fr) !important;
   }
@@ -1083,10 +1078,10 @@ body{
   line-height: 1.5;
 }
 
-/* FIX 8: Kanban Layout - 4-column horizontal on 1080px tablet, 2-column on smaller screens */
-@media (max-width: 1200px) and (min-width: 900px) {
+/* FIX 8: Kanban Layout - Better Space Utilization on Tablet */
+@media (max-width: 1200px) {
   .kanban {
-    grid-template-columns: repeat(4, 1fr) !important;
+    grid-template-columns: repeat(2, 1fr) !important;
     gap: 10px;
   }
   
@@ -1105,14 +1100,6 @@ body{
     height: auto !important;
     min-height: 100vh !important;
     overflow: visible !important;
-  }
-}
-
-/* Kanban: 2-column layout for medium tablets (769-899px) */
-@media (max-width: 899px) and (min-width: 769px) {
-  .kanban {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 10px;
   }
 }
 
