@@ -301,7 +301,7 @@ async def lifespan(app: FastAPI):
     sync_reports_inbox()
     yield
 
-app = FastAPI(title="Mission Control", lifespan=lifespan)
+app = FastAPI(title="Mission Control", lifespan=lifespan, docs_url="/api-docs", redoc_url=None)
 app.add_middleware(CORSMiddleware, allow_origins=["https://pc1.taildb1204.ts.net:8080", "https://pc1.taildb1204.ts.net:3334", "https://pc1.taildb1204.ts.net:8765"], allow_methods=["GET"], allow_headers=["*"])
 
 def now_iso():

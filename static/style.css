@@ -2308,3 +2308,264 @@ body{
 .page-subtitle {
   color: #bbb !important;
 }
+
+/* ══════════════════════════════════════════════════════════════ */
+/* Mission Control — Dev Pass (2026-02-16 6AM)                  */
+/* Focused fixes for remaining issues                           */
+/* ══════════════════════════════════════════════════════════════ */
+
+/* FIX 81: Org Chart Model Names — Larger & Better Styled */
+.org-node-model {
+  font-size: 0.72rem !important;
+  color: var(--accent) !important;
+  margin-top: 6px;
+  letter-spacing: 0.3px;
+  opacity: 0.85;
+  font-weight: 500;
+}
+
+/* FIX 82: Org Chart — Roles for Child Agents */
+.org-node-role {
+  font-size: 0.72rem !important;
+  color: #bbb !important;
+  margin-top: 4px;
+  min-height: 1em;
+}
+
+/* FIX 83: Report Card Titles — Higher Contrast */
+.report-card-title {
+  color: #fff !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+  line-height: 1.35;
+}
+
+/* FIX 84: Report Card Dates — Readable */
+.report-card-date {
+  color: #ccc !important;
+  font-size: 0.74rem !important;
+}
+
+/* FIX 85: Report Card Author — Toned Down */
+.report-card-author {
+  color: var(--accent) !important;
+  font-size: 0.78rem !important;
+  opacity: 0.8;
+}
+
+/* FIX 86: Scheduled Tasks — Better Job Row Styling */
+.job-title {
+  color: #fff !important;
+  font-weight: 700 !important;
+}
+
+.job-desc {
+  color: #bbb !important;
+  font-size: 0.74rem !important;
+  line-height: 1.5;
+}
+
+.job-schedule {
+  color: var(--accent) !important;
+  font-weight: 600;
+}
+
+.job-run-info {
+  color: #999 !important;
+}
+
+/* FIX 87: Standup Cards — Better Styling */
+.standup-list-item {
+  border-left: 3px solid var(--accent);
+  transition: all 0.15s;
+}
+
+.standup-list-title {
+  color: #fff !important;
+  font-weight: 700 !important;
+}
+
+.standup-list-date {
+  color: #bbb !important;
+}
+
+/* FIX 88: Action Items — Better Contrast */
+.action-section-title {
+  color: #ddd !important;
+  font-weight: 700 !important;
+}
+
+.action-item-text {
+  color: #f0f0f0 !important;
+}
+
+.action-item-assignee {
+  background: rgba(0, 188, 212, 0.12) !important;
+  color: var(--accent) !important;
+  font-weight: 600;
+}
+
+.action-item-delete {
+  color: #999 !important;
+}
+
+/* FIX 89: GPU Panel — Fix Value Clipping at Right Edge */
+@media (max-width: 1200px) {
+  .gpu-widget {
+    overflow: hidden !important;
+  }
+  
+  .gpu-row {
+    gap: 4px !important;
+    flex-wrap: nowrap;
+  }
+  
+  .gpu-label {
+    min-width: 50px !important;
+    flex-shrink: 0;
+  }
+  
+  .gpu-value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* FIX 90: Kanban — Better Empty Column Behavior at Tablet */
+@media (max-width: 1200px) and (min-width: 769px) {
+  .kanban {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+/* FIX 91: Participant Pills — Better Contrast */
+.participant-pill {
+  font-weight: 700 !important;
+  font-size: 0.66rem !important;
+}
+
+/* FIX 92: Org Chart Stats Bar — Better Styling */
+.org-stat-value {
+  color: #fff !important;
+  font-weight: 800 !important;
+}
+
+.org-stat-label {
+  color: #bbb !important;
+}
+
+/* FIX 93: Task Manager Cards — Better Overflow */
+@media (max-width: 1200px) {
+  .agent-cards-row {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
+    gap: 12px;
+  }
+  
+  .agent-card-lg {
+    padding: 16px;
+  }
+}
+
+/* FIX 94: Workspace Layout — Better Sidebar on Tablet */
+@media (max-width: 1200px) {
+  .workspace-layout {
+    min-height: 500px !important;
+  }
+  
+  .ws-sidebar {
+    width: 220px !important;
+    min-width: 220px !important;
+  }
+  
+  .ws-agent-name {
+    font-size: 0.8rem !important;
+    color: #fff !important;
+  }
+  
+  .ws-file {
+    color: #bbb !important;
+    font-size: 0.74rem !important;
+  }
+  
+  .ws-file:hover {
+    color: #fff !important;
+  }
+}
+
+/* FIX 95: Docs Content — Better Typography */
+.doc-content {
+  color: #e8e8e8 !important;
+}
+
+.doc-content h1 {
+  color: #fff !important;
+}
+
+.doc-content h2 {
+  color: #fff !important;
+}
+
+.doc-content h3 {
+  color: #ddd !important;
+}
+
+/* FIX 96: Nav Tab Active State — Ensure Visible */
+.nav-tab.active {
+  background: var(--accent) !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  box-shadow: 0 0 12px rgba(0, 188, 212, 0.4) !important;
+}
+
+/* FIX 97: Section Blocks — Visible Borders */
+.section-block {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.section-title {
+  color: #fff !important;
+  font-weight: 700 !important;
+  font-size: 1rem !important;
+}
+
+/* FIX 98: Overnight Log Entries — Better Styling */
+.log-entry {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.log-entry-title {
+  color: #fff !important;
+  font-weight: 600 !important;
+}
+
+.log-entry-body {
+  color: #ccc !important;
+}
+
+.log-entry-time {
+  color: #999 !important;
+}
+
+/* FIX 99: Workspace File Content — Readable */
+.ws-file-content {
+  color: #e0e0e0 !important;
+}
+
+/* FIX 100: Voice Page — Better Feature Cards */
+.voice-feature strong {
+  color: #fff !important;
+}
+
+.voice-feature p {
+  color: #bbb !important;
+}
+
+.voice-placeholder h3 {
+  color: #fff !important;
+}
+
+.voice-placeholder > p {
+  color: #bbb !important;
+}
