@@ -2569,3 +2569,105 @@ body{
 .voice-placeholder > p {
   color: #bbb !important;
 }
+
+/* FIX 101: Agent Cards — Fade Mask on Right Edge (Tablet) */
+@media (max-width: 1200px) {
+  #agentsList {
+    position: relative;
+    mask-image: linear-gradient(to right, black 85%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+  }
+}
+
+/* FIX 102: Desktop Sidebar — Scroll Fade at Bottom */
+@media (min-width: 1201px) {
+  .sidebar {
+    position: relative;
+  }
+  
+  #agentsPanel::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 50px;
+    background: linear-gradient(transparent, var(--surface));
+    pointer-events: none;
+    z-index: 5;
+  }
+}
+
+/* FIX 103: Agent Card — Fade-in Animation */
+.agent-card {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* FIX 104: Task Manager Empty State */
+.agent-cards-row:empty::after {
+  content: 'Loading agent data...';
+  display: block;
+  text-align: center;
+  padding: 40px;
+  color: #999;
+  font-size: 0.9rem;
+  grid-column: 1 / -1;
+}
+
+/* FIX 105: Report Grid — Better Layout at 1080px */
+@media (max-width: 1200px) {
+  .reports-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+    gap: 12px;
+  }
+  
+  .report-card {
+    padding: 14px 16px;
+  }
+}
+
+/* FIX 106: Scheduled Tasks — Description Truncation */
+.job-desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* FIX 107: Scheduled Tasks — Full Row Border */
+.job-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.job-row:last-child {
+  border-bottom: none !important;
+}
+
+/* FIX 108: Org Chart — Better Node Styling */
+.org-node {
+  backdrop-filter: blur(4px);
+}
+
+.org-node-name {
+  color: #fff !important;
+  font-weight: 800 !important;
+}
+
+/* FIX 109: Better Empty States for Kanban */
+.col-empty {
+  font-style: italic;
+  padding: 24px 16px !important;
+  line-height: 1.6;
+}
+
+/* FIX 110: Workspace Section Title */
+.ws-section-title {
+  color: #ddd !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+}
