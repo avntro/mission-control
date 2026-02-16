@@ -13,11 +13,31 @@ let orgExpanded = true;
 // Kanban agent filter
 function updateKanbanFilter(val) {
   localStorage.setItem('kanbanAgents', val);
+  updateFilterChip(val);
   loadLiveTasks().then(() => renderBoard());
+}
+function clearKanbanFilter() {
+  const sel = document.getElementById('kanbanAgentFilter');
+  if (sel) sel.value = 'all';
+  updateKanbanFilter('all');
+}
+function updateFilterChip(val) {
+  const chip = document.getElementById('filterChip');
+  const label = document.getElementById('filterChipLabel');
+  if (!chip) return;
+  if (val && val !== 'all') {
+    const name = val.charAt(0).toUpperCase() + val.slice(1);
+    label.textContent = `🔍 Filtered: ${name} Only`;
+    chip.style.display = '';
+  } else {
+    chip.style.display = 'none';
+  }
 }
 document.addEventListener('DOMContentLoaded', () => {
   const sel = document.getElementById('kanbanAgentFilter');
-  if (sel) sel.value = localStorage.getItem('kanbanAgents') || 'dev';
+  const saved = localStorage.getItem('kanbanAgents') || 'dev';
+  if (sel) sel.value = saved;
+  updateFilterChip(saved);
 });
 
 // Generate short display ID for tasks (e.g., "#A3F" from UUID)
@@ -116,6 +136,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // Workspace auto-update polling
   lastWorkspaceCheck = new Date().toISOString();
   setInterval(checkWorkspaceChanges, 5000);
+  // Agent scroll detection for gradient fade
+  const agentsList = document.getElementById('agentsList');
+  const scrollWrap = document.getElementById('agentsScrollWrap');
+  if (agentsList && scrollWrap) {
+    agentsList.addEventListener('scroll', () => {
+      const atEnd = agentsList.scrollLeft + agentsList.clientWidth >= agentsList.scrollWidth - 10;
+      scrollWrap.classList.toggle('scrolled-end', atEnd);
+    });
+  }
 });
 
 function tickTimers() {
@@ -247,6 +276,12 @@ function renderBoard() {
       document.getElementById(`count-${status}`).textContent = items.length;
     }
   }
+  // Toggle empty state class on columns for responsive sizing
+  document.querySelectorAll('.kanban-col').forEach(col => {
+    const cards = col.querySelector('.col-cards');
+    const isEmpty = cards && (cards.children.length === 0 || (cards.children.length === 1 && cards.children[0].classList.contains('col-empty')));
+    col.classList.toggle('col-empty-state', isEmpty);
+  });
   // Show/hide Approve All button
   const approveAllBtn = document.getElementById('btn-approve-all');
   if (approveAllBtn) { const rc = cols.review.length; approveAllBtn.style.display = rc > 0 ? 'inline-block' : 'none'; approveAllBtn.textContent = `✅ Approve All`; }
@@ -343,6 +378,12 @@ function renderAgents() {
   const activeCount = agentStats.filter(s => s.active).length;
   const statusEl = document.getElementById('navStatus');
   if (statusEl) statusEl.textContent = `${agents.length} agents · ${activeCount} active`;
+  // Update agent count badge (tablet scroll indicator)
+  const countBadge = document.getElementById('agentCountBadge');
+  if (countBadge) {
+    countBadge.textContent = `${agents.length} total · ${activeCount} active`;
+    countBadge.style.display = '';
+  }
   const items = agents.map(a => {
     const stats = agentStats.find(s => s.name === a.name);
     const isActive = stats ? stats.active : a.status === 'busy';
@@ -1402,12 +1443,42 @@ async function loadSystemStats() {
     if (!res.ok) throw new Error('System stats unavailable');
     const s = await res.json();
     renderSystemWidget(s);
+    // Check for alert conditions
+    updateSystemAlerts(s);
   } catch(e) { 
     if (systemStatsTimeout) clearTimeout(systemStatsTimeout);
     const el = document.getElementById('systemWidget');
     if (el) {
       el.innerHTML = '<div class="gpu-error">Stats unavailable</div>'; 
     }
+  }
+}
+
+function updateSystemAlerts(s) {
+  const swap = s.swap || {};
+  const disk = s.disk || {};
+  const ram = s.ram || {};
+  const alerts = [];
+  const swapPct = swap.total_kb ? Math.round(swap.used_kb / swap.total_kb * 100) : 0;
+  const ramPct = ram.total_kb ? Math.round(ram.used_kb / ram.total_kb * 100) : 0;
+  if (swapPct >= 70) alerts.push(`⚠️ Swap: ${swapPct}% used (${formatKB(swap.used_kb)} / ${formatKB(swap.total_kb)})`);
+  if (disk.usage_pct >= 85) alerts.push(`⚠️ Disk: ${disk.usage_pct}% used (${disk.used_gb}G / ${disk.total_gb}G)`);
+  if (ramPct >= 85) alerts.push(`⚠️ RAM: ${ramPct}% used`);
+  
+  let banner = document.getElementById('systemAlertBanner');
+  if (alerts.length > 0) {
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'systemAlertBanner';
+      banner.className = 'system-alert-banner';
+      const pageHeader = document.querySelector('#page-dashboard .page-header');
+      if (pageHeader) pageHeader.after(banner);
+    }
+    const isCritical = swapPct >= 85 || (disk.usage_pct >= 90) || ramPct >= 90;
+    banner.className = 'system-alert-banner' + (isCritical ? ' alert-critical' : '');
+    banner.innerHTML = alerts.join(' &nbsp;·&nbsp; ');
+  } else if (banner) {
+    banner.remove();
   }
 }
 

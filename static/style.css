@@ -1543,16 +1543,25 @@ body{
 /* Target: 1080x1024 tablet viewport issues                     */
 /* ══════════════════════════════════════════════════════════════ */
 
-/* FIX 41: Kanban - 4 columns at tablet (1080px+), 2 columns on smaller */
+/* FIX 41: Kanban - Smart columns at tablet (1080px+) */
 @media (max-width: 1200px) and (min-width: 769px) {
   .kanban {
-    grid-template-columns: repeat(4, 1fr) !important;
+    display: flex !important;
     gap: 8px;
     min-height: auto !important;
   }
   
   .kanban-col {
     min-height: 200px;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  
+  /* Empty columns take less space */
+  .kanban-col.col-empty-state {
+    flex: 0 0 120px !important;
+    min-width: 100px;
+    max-width: 140px;
   }
   
   .col-cards {
@@ -1964,24 +1973,50 @@ body{
 /* Fixes for remaining issues after initial responsive update   */
 /* ══════════════════════════════════════════════════════════════ */
 
-/* FIX 61: Agent Cards - Visible Scroll Indicator (Tablet) */
+/* FIX 61: Agent Cards - Gradient Fade + Count Indicator (Tablet) */
 @media (max-width: 1200px) {
+  /* Remove old scroll indicator */
   #agentsList::before {
-    content: '← Scroll →';
+    display: none !important;
+  }
+  #agentsList::after {
+    display: none !important;
+  }
+  
+  /* Gradient fade on right edge to hint at more content */
+  .agents-scroll-wrap {
+    position: relative;
+    overflow: hidden;
+  }
+  .agents-scroll-wrap::after {
+    content: '';
     position: absolute;
-    right: 12px;
-    bottom: 2px;
-    background: rgba(0, 188, 212, 0.9);
-    color: #fff;
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 0.65rem;
-    font-weight: 700;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 40px;
+    background: linear-gradient(to right, transparent, var(--surface));
     pointer-events: none;
-    z-index: 10;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    opacity: 0.85;
-    letter-spacing: 0.5px;
+    z-index: 5;
+  }
+  .agents-scroll-wrap.scrolled-end::after {
+    opacity: 0;
+  }
+  
+  /* Agent count badge */
+  .agent-count-badge {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+    color: var(--accent);
+    font-weight: 600;
+    padding: 2px 8px;
+    background: rgba(0, 188, 212, 0.1);
+    border-radius: 8px;
+    margin-left: 8px;
+    white-space: nowrap;
+    vertical-align: middle;
   }
 }
 
@@ -2442,10 +2477,18 @@ body{
   }
 }
 
-/* FIX 90: Kanban — Better Empty Column Behavior at Tablet */
+/* FIX 90: Kanban — Smart Column Sizing Based on Content */
 @media (max-width: 1200px) and (min-width: 769px) {
   .kanban {
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+  /* Shrink empty columns */
+  .kanban-col.col-empty-state {
+    max-width: 160px;
+    min-width: 100px;
+  }
+  .kanban-col:not(.col-empty-state) {
+    flex: 1;
   }
 }
 
@@ -3088,6 +3131,59 @@ body{
   border-color: rgba(0, 188, 212, 0.25) !important;
 }
 
+/* ── Filter Chip ───────────────────────────────────────────── */
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: rgba(255, 171, 64, 0.12);
+  border: 1px solid rgba(255, 171, 64, 0.3);
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--orange);
+  white-space: nowrap;
+  animation: chipIn 0.3s ease;
+}
+@keyframes chipIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+.filter-chip-clear {
+  background: none;
+  border: none;
+  color: var(--orange);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+.filter-chip-clear:hover { opacity: 1; }
+
+/* ── System Alert Banner ────────────────────────────────────── */
+.system-alert-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(255, 171, 64, 0.1);
+  border: 1px solid rgba(255, 171, 64, 0.25);
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: var(--orange);
+  margin-bottom: 12px;
+  animation: alertPulse 3s ease-in-out infinite;
+}
+.system-alert-banner.alert-critical {
+  background: rgba(255, 82, 82, 0.1);
+  border-color: rgba(255, 82, 82, 0.25);
+  color: var(--red);
+}
+@keyframes alertPulse {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
+}
+
 /* FIX 129: Report Detail Layout on Tablet */
 @media (max-width: 1200px) {
   .report-detail-layout {
@@ -3098,4 +3194,185 @@ body{
     width: 100% !important;
     position: static !important;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════ */
+/* Mission Control — Dev Pass (2026-02-16 12PM)                 */
+/* Fix: Desktop sidebar widgets hidden, Tablet kanban layout    */
+/* ══════════════════════════════════════════════════════════════ */
+
+/* FIX 130: Desktop Sidebar — agents-scroll-wrap must be flex child with min-height:0 */
+@media (min-width: 1201px) {
+  .sidebar {
+    display: flex !important;
+    flex-direction: column !important;
+    max-height: calc(100vh - 72px) !important;
+    overflow: hidden !important;
+  }
+
+  .agents-scroll-wrap {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0,188,212,0.4) transparent;
+  }
+  .agents-scroll-wrap::-webkit-scrollbar { width: 5px; }
+  .agents-scroll-wrap::-webkit-scrollbar-track { background: transparent; }
+  .agents-scroll-wrap::-webkit-scrollbar-thumb { background: rgba(0,188,212,0.4); border-radius: 3px; }
+  .agents-scroll-wrap::-webkit-scrollbar-thumb:hover { background: rgba(0,188,212,0.6); }
+
+  /* Keep #agentsList as a natural-height container inside scroll wrap */
+  #agentsList {
+    overflow: visible !important;
+    flex: none !important;
+  }
+
+  /* Widgets always pinned at bottom */
+  .sidebar-widgets {
+    flex-shrink: 0 !important;
+  }
+}
+
+/* FIX 131: Tablet Kanban — Force equal grid columns (override flex/grid from earlier rules) */
+@media (max-width: 1200px) and (min-width: 769px) {
+  .kanban {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 10px !important;
+    min-height: auto !important;
+  }
+
+  .kanban-col,
+  .kanban-col.col-empty-state {
+    min-width: 0 !important;
+    max-width: none !important;
+    width: auto !important;
+    flex: unset !important;
+    min-height: 180px !important;
+  }
+
+  /* Prevent "In Progress" header from wrapping */
+  .col-header {
+    white-space: nowrap !important;
+    font-size: 0.78rem !important;
+    gap: 5px !important;
+    overflow: hidden !important;
+  }
+
+  .col-dot {
+    width: 6px !important;
+    height: 6px !important;
+    flex-shrink: 0 !important;
+  }
+}
+
+/* FIX 132: Tablet Agent Cards — Better Scroll Affordance */
+@media (max-width: 1200px) {
+  .agents-scroll-wrap {
+    position: relative;
+    overflow: visible;
+  }
+
+  /* Stronger gradient fade on right edge */
+  .agents-scroll-wrap::after {
+    content: '' !important;
+    position: absolute !important;
+    right: 0 !important;
+    top: 0 !important;
+    bottom: 8px !important;
+    width: 50px !important;
+    background: linear-gradient(to right, transparent, var(--surface) 85%) !important;
+    pointer-events: none !important;
+    z-index: 5 !important;
+    opacity: 1 !important;
+    transition: opacity 0.3s !important;
+  }
+
+  .agents-scroll-wrap.scrolled-end::after {
+    opacity: 0 !important;
+  }
+}
+
+/* FIX 133: Improve sidebar-widgets contrast line on desktop */
+@media (min-width: 1201px) {
+  .sidebar-widgets {
+    border-top: 1px solid rgba(0, 188, 212, 0.15) !important;
+    padding-top: 8px !important;
+    margin-top: 8px !important;
+  }
+}
+
+/* FIX 134: Org Chart — Restore Connecting Lines (overrides FIX 111's removal) */
+.org-children {
+  position: relative !important;
+}
+
+.org-children::before {
+  display: block !important;
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 15% !important;
+  right: 15% !important;
+  height: 2px !important;
+  background: rgba(255,255,255,0.15) !important;
+  z-index: 1 !important;
+}
+
+/* Each child connector — vertical stub from horizontal bar to node */
+.org-children > .org-connector {
+  position: relative !important;
+  padding-top: 18px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+}
+
+.org-children > .org-connector::before {
+  content: '' !important;
+  display: block !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: 2px !important;
+  height: 18px !important;
+  background: rgba(255,255,255,0.15) !important;
+  z-index: 1 !important;
+}
+
+/* FIX 135: Job Description — Visual Expand Indicator */
+.job-desc:not(.expanded) {
+  position: relative;
+}
+
+.job-desc:not(.expanded)::after {
+  content: '▾ more';
+  display: inline;
+  font-size: 0.62rem;
+  color: var(--accent);
+  opacity: 0.7;
+  margin-left: 4px;
+  cursor: pointer;
+}
+
+.job-desc.expanded::after {
+  content: '▴ less';
+  display: block;
+  font-size: 0.62rem;
+  color: var(--accent);
+  opacity: 0.7;
+  margin-top: 2px;
+  cursor: pointer;
+}
+
+/* FIX 136: Reports — Date Filter Label Styling */
+.date-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 600;
+  margin-right: 2px;
+  white-space: nowrap;
 }
