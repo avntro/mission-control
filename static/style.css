@@ -3376,3 +3376,234 @@ body{
   margin-right: 2px;
   white-space: nowrap;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   FIX 137: Global Contrast Improvement
+   ══════════════════════════════════════════════════════════════ */
+:root {
+  --muted: #ccc;
+}
+
+/* Body text — improve contrast */
+.agent-meta,
+.agent-meta span,
+.task-time,
+.task-model-cost,
+.gpu-label,
+.stat-label,
+.job-desc,
+.report-card-date,
+.activity-time {
+  color: #ccc !important;
+}
+
+/* Values — brighter for readability */
+.gpu-value {
+  color: #e0e0e0 !important;
+}
+
+/* Muted text — bump from #aaa to #bbb */
+.page-subtitle,
+.topnav-right,
+.col-header,
+.tab:not(.active),
+.log-entry-time {
+  color: #bbb !important;
+}
+
+/* Column empty states — better contrast */
+.col-empty {
+  color: #aaa !important;
+  font-size: .82rem !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FIX 138: Agent Card Scroll Affordance (Tablet)
+   ══════════════════════════════════════════════════════════════ */
+@media (max-width: 1200px) {
+  .agents-scroll-wrap {
+    position: relative;
+  }
+  .agents-scroll-wrap::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 40px;
+    background: linear-gradient(to right, transparent, var(--surface));
+    pointer-events: none;
+    z-index: 2;
+    opacity: 1;
+    transition: opacity 0.3s;
+  }
+  .agents-scroll-wrap.scrolled-end::after {
+    opacity: 0;
+  }
+  /* Scroll hint text below agent cards */
+  .agent-scroll-hint {
+    display: block;
+    text-align: center;
+    font-size: .65rem;
+    color: var(--accent);
+    opacity: 0.6;
+    padding: 2px 0 0;
+    letter-spacing: 0.5px;
+  }
+}
+@media (min-width: 1201px) {
+  .agent-scroll-hint {
+    display: none;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FIX 139: Better Empty Kanban Column States
+   ══════════════════════════════════════════════════════════════ */
+.col-empty {
+  padding: 24px 14px !important;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+/* On desktop: empty columns get slightly less width */
+@media (min-width: 1201px) {
+  .kanban-col[data-status="todo"]:has(.col-empty),
+  .kanban-col[data-status="in_progress"]:has(.col-empty) {
+    opacity: 0.85;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FIX 140: Task Manager — Center Incomplete Last Row
+   ══════════════════════════════════════════════════════════════ */
+.agent-cards-row {
+  justify-content: center !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FIX 141: Org Chart — Better Centering & Alignment
+   ══════════════════════════════════════════════════════════════ */
+.org-stats-bar {
+  justify-content: center !important;
+}
+
+.org-level {
+  justify-content: center !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FIX 142: Scheduled Tasks — JS-Based Word-Boundary Truncation
+   (Override all CSS line-clamp — JS handles truncation now)
+   ══════════════════════════════════════════════════════════════ */
+.job-desc {
+  display: block !important;
+  -webkit-line-clamp: unset !important;
+  -webkit-box-orient: unset !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.job-desc:not(.expanded)::after {
+  content: ' ▾ more' !important;
+  font-size: 0.64rem;
+  color: var(--accent);
+  opacity: 0.8;
+}
+.job-desc.expanded::after {
+  content: ' ▴ less' !important;
+  font-size: 0.64rem;
+  color: var(--accent);
+  opacity: 0.8;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FIX 143: Sub-agent Badge — Friendlier Indicator
+   ══════════════════════════════════════════════════════════════ */
+.agent-subagent-row {
+  background: rgba(0, 188, 212, 0.06);
+  border-radius: 6px;
+  padding: 3px 6px !important;
+  margin-top: 2px;
+  cursor: pointer;
+}
+.agent-subagent-row:hover {
+  background: rgba(0, 188, 212, 0.12);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FIX 144: Job Schedule — Human-Readable Styling
+   ══════════════════════════════════════════════════════════════ */
+.job-schedule {
+  font-size: .72rem !important;
+  white-space: nowrap;
+  background: rgba(0, 188, 212, 0.08);
+  padding: 3px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 188, 212, 0.15);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FIX 145: Improve Active Tab Visibility
+   ══════════════════════════════════════════════════════════════ */
+.tab.active {
+  background: var(--card) !important;
+  color: #fff !important;
+  border-bottom: 2px solid var(--accent) !important;
+  font-weight: 600 !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FIX 146: Agent Status Badge Colors — Clearer Hierarchy
+   ══════════════════════════════════════════════════════════════ */
+.status-idle {
+  background: rgba(136, 136, 136, 0.12) !important;
+  color: #999 !important;
+}
+.status-busy {
+  background: rgba(0, 230, 118, 0.15) !important;
+  color: var(--green) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FIX 148: Task Card Metadata — Better Readability
+   ══════════════════════════════════════════════════════════════ */
+.task-model-cost {
+  color: #aaa !important;
+  font-size: .72rem !important;
+}
+.task-time {
+  color: #bbb !important;
+}
+.task-duration {
+  color: var(--green) !important;
+}
+.task-tokens {
+  color: #bbb !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FIX 149: Agent Card Metadata — Slightly Brighter
+   ══════════════════════════════════════════════════════════════ */
+.agent-meta span {
+  color: #bbb !important;
+}
+.agent-token-value {
+  color: #ddd !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FIX 147: Better Nav Tab Scrollability on Tablet
+   ══════════════════════════════════════════════════════════════ */
+@media (max-width: 1200px) {
+  .topnav-tabs {
+    mask-image: linear-gradient(to right, black 90%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
+  }
+  .topnav-tabs:hover,
+  .topnav-tabs:focus-within {
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+}

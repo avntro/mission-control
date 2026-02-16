@@ -727,11 +727,42 @@ def get_overnight_log_internal(agent_filter=None):
 # ── Scheduled Tasks (REAL from OpenClaw cron store) ─────────────
 CRON_JOBS_FILE = os.path.join(OPENCLAW_HOME, "cron", "jobs.json")
 
+def _humanize_cron_expr(expr: str, tz: str = "UTC") -> str:
+    """Convert common cron expressions to plain English."""
+    parts = expr.strip().split()
+    if len(parts) < 5:
+        return ""
+    minute, hour, dom, month, dow = parts[:5]
+    tz_short = tz.split("/")[-1] if "/" in tz else tz
+    
+    # Daily at specific time
+    if dom == "*" and month == "*" and dow == "*" and minute.isdigit() and hour.isdigit():
+        h, m = int(hour), int(minute)
+        ampm = "AM" if h < 12 else "PM"
+        h12 = h if h <= 12 else h - 12
+        if h12 == 0: h12 = 12
+        return f"Daily at {h12}:{m:02d} {ampm} ({tz_short})"
+    
+    # Weekly on specific day
+    if dom == "*" and month == "*" and dow.isdigit() and minute.isdigit() and hour.isdigit():
+        days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        day_idx = int(dow) % 7
+        h, m = int(hour), int(minute)
+        ampm = "AM" if h < 12 else "PM"
+        h12 = h if h <= 12 else h - 12
+        if h12 == 0: h12 = 12
+        return f"Every {days[day_idx]} at {h12}:{m:02d} {ampm} ({tz_short})"
+    
+    return ""
+
 def _humanize_schedule(sched: dict) -> str:
     kind = sched.get("kind", "")
     if kind == "cron":
         expr = sched.get("expr", "")
         tz = sched.get("tz", "UTC")
+        human = _humanize_cron_expr(expr, tz)
+        if human:
+            return human
         return f"Cron: {expr} ({tz})"
     elif kind == "at":
         at = sched.get("at", "")

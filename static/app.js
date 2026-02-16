@@ -1045,12 +1045,16 @@ function jobRowHTML(job) {
   const nextRun = job.next_run ? timeAgo(job.next_run) : '';
   const durStr = job.last_duration_ms ? `${(job.last_duration_ms/1000).toFixed(1)}s` : '';
   const oneTimeBadge = job.delete_after_run ? '<span class="job-onetime-badge">ONE-TIME</span>' : '';
+  const desc = job.description || '';
+  const maxLen = 120;
+  const needsTrunc = desc.length > maxLen;
+  const truncDesc = needsTrunc ? desc.substring(0, desc.lastIndexOf(' ', maxLen)) + '…' : desc;
   return `<div class="job-row">
     <span class="job-icon">${lastIcon}</span>
     <span class="job-status-dot" style="background:${statusDot}"></span>
     <div class="job-info">
       <div class="job-title">${esc(job.title)} ${oneTimeBadge}</div>
-      <div class="job-desc" onclick="this.classList.toggle('expanded')" title="Click to expand/collapse">${esc(job.description)}</div>
+      <div class="job-desc${needsTrunc ? '' : ' expanded'}" onclick="this.classList.toggle('expanded')" title="${needsTrunc ? 'Click to expand' : ''}" data-full="${esc(desc)}" data-short="${esc(truncDesc)}">${needsTrunc ? esc(truncDesc) : esc(desc)}</div>
       <div class="job-run-info">Last: ${lastRun}${durStr ? ' ('+durStr+')' : ''} ${nextRun ? '· Next: '+nextRun : ''}</div>
     </div>
     <span class="job-agent-pill">${info.emoji} ${info.name}</span>
@@ -2069,3 +2073,33 @@ window.fetch = async function(...args) {
 function esc(s) { if (!s) return ''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function timeAgo(iso) { if (!iso) return ''; const diff = (Date.now() - new Date(iso).getTime()) / 1000; if (diff < 0) { const f = -diff; if (f < 60) return 'in <1m'; if (f < 3600) return `in ${Math.floor(f/60)}m`; if (f < 86400) return `in ${Math.floor(f/3600)}h`; return `in ${Math.floor(f/86400)}d`; } if (diff < 60) return 'just now'; if (diff < 3600) return `${Math.floor(diff/60)}m ago`; if (diff < 86400) return `${Math.floor(diff/3600)}h ago`; return `${Math.floor(diff/86400)}d ago`; }
 function formatDuration(secs) { if (!secs) return ''; secs = Math.round(secs); if (secs < 60) return `${secs}s`; if (secs < 3600) { const m = Math.floor(secs/60), s = secs%60; return s > 0 ? `${m}m ${s}s` : `${m}m`; } const h = Math.floor(secs/3600), m = Math.floor((secs%3600)/60); return m > 0 ? `${h}h ${m}m` : `${h}h`; }
+
+// ── FIX 142: Job Desc Toggle (word-boundary truncation) ──
+document.addEventListener('click', (e) => {
+  const desc = e.target.closest('.job-desc');
+  if (!desc || !desc.dataset.full) return;
+  const isExpanded = desc.classList.contains('expanded');
+  if (isExpanded) {
+    desc.textContent = desc.dataset.short;
+    desc.classList.remove('expanded');
+  } else {
+    desc.textContent = desc.dataset.full;
+    desc.classList.add('expanded');
+  }
+});
+
+// ── FIX 137: Agent Card Scroll Affordance ──
+document.addEventListener('DOMContentLoaded', () => {
+  const agentsList = document.getElementById('agentsList');
+  const scrollWrap = document.getElementById('agentsScrollWrap');
+  if (agentsList && scrollWrap) {
+    const checkScroll = () => {
+      const atEnd = agentsList.scrollLeft + agentsList.clientWidth >= agentsList.scrollWidth - 10;
+      scrollWrap.classList.toggle('scrolled-end', atEnd);
+    };
+    agentsList.addEventListener('scroll', checkScroll, { passive: true });
+    // Re-check after agents render
+    new MutationObserver(checkScroll).observe(agentsList, { childList: true });
+    setTimeout(checkScroll, 2000);
+  }
+});
