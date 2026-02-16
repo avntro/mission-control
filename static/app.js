@@ -966,9 +966,9 @@ function renderOrgChart() {
   const collapsed = orgExpanded ? '' : 'collapsed';
   tree.innerHTML = `
     <div class="org-level"><div class="org-node" onclick="toggleOrgChildren('mike-children')"><div class="org-node-avatar">👤</div><div class="org-node-name">Argyris</div><div class="org-node-role">Owner · CEO · Vision & Strategy</div><div class="org-node-status">${statusDot('idle')} <span style="color:var(--green)">Online</span></div></div></div>
-    <div style="display:flex;justify-content:center"><div style="width:2px;height:30px;background:var(--border-hover)"></div></div>
+    <div style="display:flex;justify-content:center"><div style="width:2px;height:18px;background:var(--border-hover)"></div></div>
     <div class="org-level"><div class="org-node" onclick="toggleOrgChildren('agent-children')"><div class="org-node-avatar">🎯</div><div class="org-node-name">Mike</div><div class="org-node-role">COO · Facilitator · Task Delegation</div><div class="org-node-model">anthropic/claude-opus-4-6</div>${(() => { const ms = agentStats.find(s => s.name === 'main'); return ms && ms.subagent_count > 0 ? `<div class="org-node-subagents" onclick="event.stopPropagation();openSubagentPanel('main',event)">🔀 ${ms.active_subagents > 0 ? ms.active_subagents + ' active / ' : ''}${ms.subagent_count} ${pluralSub(ms.subagent_count)}</div>` : ''; })()}<div class="org-node-status">${statusDot(getStatus('main'))} <span>${getStatus('main')}</span></div></div></div>
-    <div style="display:flex;justify-content:center"><div style="width:2px;height:30px;background:var(--border-hover)"></div></div>
+    <div style="display:flex;justify-content:center"><div style="width:2px;height:18px;background:var(--border-hover)"></div></div>
     <div class="org-children ${collapsed}" id="agent-children">${childAgents.map(a => `<div class="org-connector"><div class="org-node"><div class="org-node-avatar">${a.emoji}</div><div class="org-node-name">${a.name}</div><div class="org-node-role">${a.role}</div><div class="org-node-model">${a.model}</div>${a.subagentCount > 0 ? `<div class="org-node-subagents" onclick="event.stopPropagation();openSubagentPanel('${a.id}',event)">🔀 ${a.activeSubagents > 0 ? a.activeSubagents + ' active / ' : ''}${a.subagentCount} ${pluralSub(a.subagentCount)}</div>` : ''}<div class="org-node-status">${statusDot(getStatus(a.id))} <span>${getStatus(a.id)}</span></div></div></div>`).join('')}</div>`;
 }
 
@@ -1009,7 +1009,7 @@ function jobRowHTML(job) {
     <span class="job-status-dot" style="background:${statusDot}"></span>
     <div class="job-info">
       <div class="job-title">${esc(job.title)} ${oneTimeBadge}</div>
-      <div class="job-desc">${esc(job.description)}</div>
+      <div class="job-desc" onclick="this.classList.toggle('expanded')" title="Click to expand/collapse">${esc(job.description)}</div>
       <div class="job-run-info">Last: ${lastRun}${durStr ? ' ('+durStr+')' : ''} ${nextRun ? '· Next: '+nextRun : ''}</div>
     </div>
     <span class="job-agent-pill">${info.emoji} ${info.name}</span>

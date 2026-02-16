@@ -2027,7 +2027,7 @@ body{
   overflow-wrap: break-word;
 }
 
-/* FIX 64: Agent Sidebar - Ensure Scrollable */
+/* FIX 64: Agent Sidebar - Flexible Layout */
 .sidebar {
   display: flex;
   flex-direction: column;
@@ -2035,7 +2035,9 @@ body{
 }
 
 #agentsList {
-  flex-shrink: 0;
+  flex-shrink: 1; /* Allow shrinking on desktop */
+  flex-grow: 1;
+  min-height: 100px;
 }
 
 .sidebar-widgets {
@@ -2043,11 +2045,17 @@ body{
   min-height: 0;
 }
 
-/* Desktop only - make sidebar scrollable */
+/* Desktop only - agents scroll, widgets pinned */
 @media (min-width: 1201px) {
   .sidebar {
     max-height: calc(100vh - 70px);
+    overflow: hidden !important;
+  }
+  
+  #agentsList {
     overflow-y: auto !important;
+    flex: 1 1 auto !important;
+    min-height: 100px !important;
   }
 }
 
@@ -2218,10 +2226,11 @@ body{
 
 /* FIX 75: Agent Context Bars - More Visible */
 .agent-ctx-bar {
-  height: 5px !important;
-  background: rgba(255, 255, 255, 0.1) !important;
-  border-radius: 2px;
+  height: 6px !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-radius: 3px;
   margin-top: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .agent-ctx-fill {
@@ -2570,33 +2579,9 @@ body{
   color: #bbb !important;
 }
 
-/* FIX 101: Agent Cards — Fade Mask on Right Edge (Tablet) */
-@media (max-width: 1200px) {
-  #agentsList {
-    position: relative;
-    mask-image: linear-gradient(to right, black 85%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
-  }
-}
+/* FIX 101: Agent Cards — Removed mask (it hides content and scrollbar) */
 
-/* FIX 102: Desktop Sidebar — Scroll Fade at Bottom */
-@media (min-width: 1201px) {
-  .sidebar {
-    position: relative;
-  }
-  
-  #agentsPanel::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 50px;
-    background: linear-gradient(transparent, var(--surface));
-    pointer-events: none;
-    z-index: 5;
-  }
-}
+/* FIX 102: Desktop Sidebar — Removed (replaced by FIX 121 agent list scroll fade) */
 
 /* FIX 103: Agent Card — Fade-in Animation */
 .agent-card {
@@ -2670,4 +2655,447 @@ body{
   color: #ddd !important;
   font-weight: 700 !important;
   font-size: 0.75rem !important;
+}
+
+/* ══════════════════════════════════════════════════════════════ */
+/* Mission Control — Dev Pass (2026-02-16 9AM)                  */
+/* Focused improvements from screenshot analysis                */
+/* ══════════════════════════════════════════════════════════════ */
+
+/* FIX 111: Org Chart — Flex Layout for Child Agents (Centered) */
+.org-children {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+  gap: 14px !important;
+  padding: 16px 20px 0 !important;
+  max-width: 100%;
+}
+
+.org-children::before {
+  display: none !important; /* Remove the old horizontal bar */
+}
+
+.org-connector {
+  display: flex;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.org-connector::before {
+  display: none !important; /* Remove individual connector stubs — replaced below */
+}
+
+/* FIX 112: Org Chart — Tighter Vertical Spacing */
+.org-tree {
+  padding: 12px 0 30px !important;
+}
+
+.org-level {
+  margin-bottom: 8px !important;
+}
+
+/* The vertical connector bars between levels */
+.org-tree > div:not(.org-level):not(.org-children) {
+  height: auto !important;
+}
+
+.org-tree > div:not(.org-level):not(.org-children) > div {
+  height: 18px !important;
+}
+
+/* FIX 113: Org Chart — Proper Horizontal Connector Line from Mike to Children */
+.org-children-connector {
+  display: flex;
+  justify-content: center;
+  position: relative;
+  padding: 0 10%;
+  margin-bottom: 0;
+}
+
+.org-children-connector::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: var(--border-hover);
+}
+
+.org-children-connector::after {
+  content: '';
+  width: 2px;
+  height: 18px;
+  background: var(--border-hover);
+}
+
+/* Each child gets a small top connector */
+.org-children .org-connector {
+  position: relative;
+  padding-top: 12px;
+}
+
+.org-children .org-connector::before {
+  content: '' !important;
+  display: block !important;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 2px;
+  height: 12px;
+  background: var(--border-hover);
+}
+
+/* FIX 114: Org Chart Nodes — Smaller on Tablet for Better Fit */
+@media (max-width: 1200px) {
+  .org-children {
+    gap: 10px !important;
+    padding: 12px 10px 0 !important;
+  }
+
+  .org-node {
+    min-width: 120px !important;
+    max-width: 160px !important;
+    padding: 10px 12px !important;
+  }
+
+  .org-node-avatar {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 1.2rem !important;
+    margin-bottom: 6px !important;
+  }
+
+  .org-node-name {
+    font-size: 0.82rem !important;
+  }
+
+  .org-node-role {
+    font-size: 0.65rem !important;
+  }
+
+  .org-node-model {
+    font-size: 0.62rem !important;
+  }
+
+  .org-node-status {
+    font-size: 0.6rem !important;
+  }
+}
+
+/* FIX 115: Task Manager — Context Bar Track Visibility (0% case) */
+.agent-ctx-bar-lg {
+  height: 8px !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-radius: 4px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  margin: 6px 12px 8px !important;
+}
+
+.agent-ctx-bar-lg .agent-ctx-fill {
+  min-width: 0;
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+/* Also fix the dashboard sidebar context bar track */
+.agent-ctx-bar {
+  height: 6px !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-radius: 3px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* FIX 116: Scheduled Tasks — Better Description Truncation with Ellipsis */
+.job-desc {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100%;
+  word-break: break-word;
+}
+
+/* Make descriptions expandable on click */
+.job-desc.expanded {
+  -webkit-line-clamp: unset !important;
+  display: block !important;
+}
+
+/* FIX 117: Scheduled Tasks — Better Layout on Tablet */
+@media (max-width: 1200px) {
+  .job-row {
+    flex-wrap: wrap !important;
+    padding: 14px 12px !important;
+    gap: 8px !important;
+  }
+
+  .job-info {
+    flex: 1 1 100% !important;
+    min-width: 0;
+    order: 1;
+  }
+
+  .job-icon {
+    order: 0;
+    flex-shrink: 0;
+  }
+
+  .job-status-dot {
+    order: 0;
+    flex-shrink: 0;
+  }
+
+  .job-agent-pill,
+  .job-schedule {
+    order: 2;
+    font-size: 0.68rem !important;
+  }
+
+  .job-title {
+    font-size: 0.84rem !important;
+  }
+
+  .job-desc {
+    font-size: 0.72rem !important;
+    -webkit-line-clamp: 3 !important; /* Allow 3 lines on tablet */
+  }
+}
+
+/* FIX 118: Task Manager Stats Bar — Equal Widths */
+.stats-bar {
+  display: grid !important;
+  grid-template-columns: repeat(6, 1fr) !important;
+  gap: 10px !important;
+}
+
+@media (max-width: 1200px) {
+  .stats-bar {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .stats-bar {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* FIX 119: Task Manager — Model Name Overflow */
+.model-tag {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
+  font-size: 0.7rem !important;
+  color: #aaa !important;
+}
+
+@media (max-width: 1200px) {
+  .agent-card-lg-info h3 {
+    font-size: 0.92rem !important;
+  }
+
+  .model-tag {
+    font-size: 0.65rem !important;
+    max-width: 160px !important;
+  }
+}
+
+/* FIX 120: Org Chart — Top-level nodes tighter */
+.org-level + div {
+  margin: 0 !important;
+}
+
+/* FIX 121: Agent Sidebar Desktop — Scrollable Agent List + Pinned Widgets */
+@media (min-width: 1201px) {
+  .sidebar {
+    display: flex !important;
+    flex-direction: column !important;
+    max-height: calc(100vh - 72px) !important;
+    overflow: hidden !important;
+  }
+
+  #agentsList {
+    flex: 1 1 auto;
+    min-height: 100px;
+    overflow-y: auto !important;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0,188,212,0.5) rgba(255,255,255,0.05);
+    padding-bottom: 4px;
+    position: relative;
+  }
+
+  #agentsList::-webkit-scrollbar { width: 6px; }
+  #agentsList::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); border-radius: 3px; }
+  #agentsList::-webkit-scrollbar-thumb { background: rgba(0,188,212,0.5); border-radius: 3px; }
+  #agentsList::-webkit-scrollbar-thumb:hover { background: rgba(0,188,212,0.7); }
+
+  .sidebar-widgets {
+    flex-shrink: 0 !important;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* Compact widgets on desktop */
+  .sidebar-widgets .gpu-widget {
+    padding: 8px !important;
+  }
+
+  .sidebar-widgets .gpu-row {
+    padding: 1px 0 !important;
+    font-size: 0.7rem !important;
+  }
+
+  .sidebar-widgets .gpu-bar-wrap {
+    height: 3px !important;
+    margin-top: 2px !important;
+  }
+
+  .sidebar-widgets .gpu-sparkline {
+    height: 16px !important;
+    margin-top: 4px !important;
+  }
+
+  .sidebar-widget-col h2 {
+    font-size: 0.72rem !important;
+    margin-top: 4px !important;
+    margin-bottom: 4px !important;
+  }
+}
+
+/* FIX 122: Agent Sidebar Desktop — Ultra-Compact Agent Cards */
+@media (min-width: 1201px) {
+  .agent-card {
+    padding: 8px 10px !important;
+    margin-bottom: 4px !important;
+  }
+
+  .agent-top {
+    margin-bottom: 2px !important;
+  }
+
+  .agent-emoji {
+    font-size: 1rem !important;
+  }
+
+  .agent-name {
+    font-size: 0.82rem !important;
+  }
+
+  .agent-token-row {
+    font-size: 0.65rem !important;
+    margin-top: 2px !important;
+  }
+
+  .agent-ctx-bar {
+    height: 4px !important;
+    margin-top: 2px !important;
+  }
+
+  .agent-meta-model {
+    font-size: 0.62rem !important;
+    margin-top: 2px !important;
+  }
+
+  .agent-meta {
+    margin-top: 2px !important;
+    gap: 0 !important;
+    font-size: 0.65rem !important;
+  }
+
+  .agent-meta span {
+    margin-bottom: 0 !important;
+    line-height: 1.3;
+  }
+
+  .agent-subagent-row {
+    font-size: 0.65rem !important;
+  }
+}
+
+/* FIX 123: Org Chart — Stats Bar Compact */
+.org-stats-bar {
+  padding: 10px 16px !important;
+  gap: 16px !important;
+  margin-bottom: 12px !important;
+}
+
+.org-stat-item {
+  padding: 2px 8px !important;
+  font-size: 0.8rem !important;
+}
+
+/* FIX 124: Kanban — Filter Dropdown Better Alignment */
+#kanbanAgentFilter {
+  align-self: center;
+}
+
+@media (max-width: 1200px) {
+  .tabs {
+    align-items: center !important;
+  }
+  
+  #kanbanAgentFilter {
+    margin-left: auto !important;
+    margin-top: 0 !important;
+    width: auto !important;
+    min-width: 120px;
+  }
+}
+
+/* FIX 125: Org Chart — Remove Bottom Fade Overlay from Sidebar on Org Page */
+#page-orgchart .org-tree {
+  overflow: visible;
+}
+
+/* FIX 126: Scheduled Tasks — Clickable Description Toggle */
+.job-desc {
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.job-desc:hover {
+  color: var(--text) !important;
+}
+
+/* FIX 127: Org Chart — Consistent Node Width */
+.org-children .org-node {
+  width: 150px !important;
+  min-width: 150px !important;
+  max-width: 150px !important;
+}
+
+@media (min-width: 1201px) {
+  .org-children .org-node {
+    width: 165px !important;
+    min-width: 165px !important;
+    max-width: 165px !important;
+  }
+}
+
+/* FIX 128: Consistent Card Borders — Subtle Glow on Hover */
+.agent-card-lg:hover,
+.stat-card:hover,
+.section-block:hover {
+  border-color: rgba(0, 188, 212, 0.25) !important;
+}
+
+/* FIX 129: Report Detail Layout on Tablet */
+@media (max-width: 1200px) {
+  .report-detail-layout {
+    flex-direction: column !important;
+  }
+
+  .report-detail-sidebar {
+    width: 100% !important;
+    position: static !important;
+  }
 }
