@@ -1252,17 +1252,44 @@ MODEL_CONTEXT_LIMITS = {
     "claude-3-5-sonnet": 200_000,
 }
 
+
+def _get_openclaw_context_tokens() -> Dict[str, int]:
+    """Read contextTokens from openclaw.json config for each agent.
+
+    Returns a dict mapping agent name -> contextTokens.
+    Also includes a '_default' key for the agents.defaults.contextTokens.
+    """
+    config_path = os.path.join(OPENCLAW_HOME, "openclaw.json")
+    result: Dict[str, int] = {}
+    try:
+        with open(config_path, "r") as f:
+            config = json.load(f)
+        agents_config = config.get("agents", {})
+        defaults = agents_config.get("defaults", {})
+        default_ctx = defaults.get("contextTokens", 0)
+        if default_ctx:
+            result["_default"] = default_ctx
+        agent_list = agents_config.get("list", [])
+        for agent in agent_list:
+            agent_id = agent.get("agentId", "")
+            ctx = agent.get("contextTokens", 0)
+            if agent_id and ctx:
+                result[agent_id] = ctx
+    except (json.JSONDecodeError, OSError, KeyError):
+        pass
+    return result
+
 def _parse_session_stats(agent_dir: str) -> Dict[str, Any]:
     """Parse session files for an agent to extract token usage and task info."""
     sessions_file = os.path.join(agent_dir, "sessions", "sessions.json")
     if not os.path.exists(sessions_file):
-        return {"sessions": [], "total_tokens": 0, "total_cost": 0, "active": False, "model": ""}
+        return {"sessions": [], "total_tokens": 0, "total_cost": 0, "active": False, "model": "", "context_tokens": 0}
 
     try:
         with open(sessions_file, "r") as f:
             sessions_data = json.load(f)
     except (json.JSONDecodeError, OSError):
-        return {"sessions": [], "total_tokens": 0, "total_cost": 0, "active": False, "model": ""}
+        return {"sessions": [], "total_tokens": 0, "total_cost": 0, "active": False, "model": "", "context_tokens": 0}
 
     total_tokens = 0
     total_cost = 0.0
@@ -1270,6 +1297,8 @@ def _parse_session_stats(agent_dir: str) -> Dict[str, Any]:
     active = False
     session_details = []
     now_ms = int(time.time() * 1000)
+    # Extract contextTokens from the main session (set by OpenClaw gateway)
+    main_context_tokens = 0
 
     for session_key, sess_info in sessions_data.items():
         sid = sess_info.get("sessionId", "")
@@ -1280,6 +1309,13 @@ def _parse_session_stats(agent_dir: str) -> Dict[str, Any]:
             is_active = (now_ms - updated_at) < 120_000
         else:
             is_active = (now_ms - updated_at) < 300_000
+
+        # Extract contextTokens from the primary main session only (e.g. "agent:dev:main")
+        # Avoid matching other sessions like "agent:main:openai:..." or "agent:main:mobile"
+        if session_key.endswith(":main") and ":subagent:" not in session_key:
+            ct = sess_info.get("contextTokens", 0)
+            if ct:
+                main_context_tokens = ct
 
         # Find the jsonl file
         jsonl_path = os.path.join(agent_dir, "sessions", f"{sid}.jsonl")
@@ -1363,6 +1399,7 @@ def _parse_session_stats(agent_dir: str) -> Dict[str, Any]:
         "total_cost": round(total_cost, 4),
         "active": active,
         "model": model,
+        "context_tokens": main_context_tokens,
     }
 
 
@@ -1377,18 +1414,30 @@ def get_agent_stats():
     agent_names = {}
     for r in rows:
         agent_names[r[0]] = {"display": r[1], "emoji": r[2], "default_model": r[3] or ""}
+    # Read real context token limits from openclaw.json config
+    config_ctx = _get_openclaw_context_tokens()
     result = []
     for name, info in agent_names.items():
         agent_dir = os.path.join(agents_dir, name)
         if not os.path.isdir(agent_dir):
             continue
         stats = _parse_session_stats(agent_dir)
-        # Strip provider prefix for model lookup (e.g. "anthropic/claude-opus-4-6" -> "claude-opus-4-6")
+        # Strip provider prefix for model display (e.g. "anthropic/claude-opus-4-6" -> "claude-opus-4-6")
         model_key = stats["model"].split("/")[-1] if stats["model"] else ""
-        # Fall back to configured default model if no model detected from sessions
         if not model_key:
             model_key = info.get("default_model", "")
-        ctx_limit = MODEL_CONTEXT_LIMITS.get(model_key, 200_000)
+        # Priority for context limit:
+        # 1. Real contextTokens from the agent's main session (set by gateway at runtime)
+        # 2. Per-agent contextTokens override from openclaw.json config
+        # 3. Default contextTokens from openclaw.json agents.defaults
+        # 4. Model-based lookup from MODEL_CONTEXT_LIMITS (last resort)
+        ctx_limit = stats.get("context_tokens", 0)
+        if not ctx_limit:
+            ctx_limit = config_ctx.get(name, 0)
+        if not ctx_limit:
+            ctx_limit = config_ctx.get("_default", 0)
+        if not ctx_limit:
+            ctx_limit = MODEL_CONTEXT_LIMITS.get(model_key, 200_000)
         # Get the main session's tokens for context %
         main_session_tokens = 0
         for s in stats["sessions"]:
