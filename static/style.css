@@ -2647,10 +2647,10 @@ body{
   grid-column: 1 / -1;
 }
 
-/* FIX 105: Report Grid — Better Layout at 1080px */
+/* FIX 105: Report Grid — Better Layout at 1080px (2-col to avoid orphans) */
 @media (max-width: 1200px) {
   .reports-grid {
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+    grid-template-columns: repeat(2, 1fr) !important;
     gap: 12px;
   }
   
@@ -3184,6 +3184,17 @@ body{
   50% { opacity: 1; }
 }
 
+/* FIX 151: Standups Cards — Max Width for Desktop Readability */
+.standup-list-item {
+  max-width: 900px;
+}
+
+/* FIX 152: Docs Sidebar — Full Height */
+.workspace-layout,
+#page-docs .workspace-layout {
+  min-height: calc(100vh - 180px);
+}
+
 /* FIX 129: Report Detail Layout on Tablet */
 @media (max-width: 1200px) {
   .report-detail-layout {
@@ -3596,14 +3607,43 @@ body{
 /* ══════════════════════════════════════════════════════════════
    FIX 147: Better Nav Tab Scrollability on Tablet
    ══════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════
+   FIX 150: Nav Tabs — ALL tabs visible at 1080px (2026-02-16 9PM)
+   Shortened labels + tighter spacing ensure Reports & Voice show
+   ══════════════════════════════════════════════════════════════ */
 @media (max-width: 1200px) {
-  .topnav-tabs {
-    mask-image: linear-gradient(to right, black 90%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
+  .topnav {
+    padding: 0 8px !important;
   }
-  .topnav-tabs:hover,
-  .topnav-tabs:focus-within {
-    mask-image: none;
-    -webkit-mask-image: none;
+  .topnav-left {
+    margin-right: 6px !important;
+  }
+  .brand {
+    font-size: 0.85rem !important;
+  }
+  .logo {
+    font-size: 1rem !important;
+  }
+  .topnav-tabs {
+    gap: 1px !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  .nav-tab {
+    padding: 6px 7px !important;
+    font-size: 0.72rem !important;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .topnav-right {
+    margin-left: 6px !important;
+    font-size: 0.7rem !important;
+    gap: 4px !important;
+  }
+  /* Hide emoji on tablet nav to save space */
+  .nav-tab {
+    letter-spacing: -0.2px;
   }
 }
