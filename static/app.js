@@ -180,7 +180,7 @@ async function loadAgentStats() {
     if (changed) { _lastAgentStatsJSON = json; agentStats = data; }
     if (changed && currentPage === 'dashboard') renderAgents();
     if (currentPage === 'taskmanager') loadTaskManager();
-    if (changed && currentPage === 'orgchart') renderOrgChart();
+    if (changed && currentPage === 'orgchart') { renderOrgChart(); drawOrgConnectors(); }
   } catch(e) { console.error('Failed to load agent stats', e); }
 }
 
@@ -216,7 +216,7 @@ function navigateTo(page, pushState = true) {
     history.pushState({ page }, '', path);
   }
   if (page === 'taskmanager') loadTaskManager();
-  if (page === 'orgchart') renderOrgChart();
+  if (page === 'orgchart') { renderOrgChart(); drawOrgConnectors(); }
   if (page === 'scheduled') loadScheduledTasks();
   if (page === 'workspaces') loadWorkspaces();
   if (page === 'standups') loadStandups();
@@ -263,7 +263,7 @@ function renderBoard() {
       const visible = expanded ? items : items.slice(0, CARD_LIMIT);
       const hidden = items.length - visible.length;
       if (items.length === 0) {
-        const emptyMsg = status === 'todo' ? 'No tasks queued' : status === 'in_progress' ? 'Nothing running' : status === 'review' ? 'Nothing to review' : 'No completed tasks';
+        const emptyMsg = status === 'todo' ? 'No tasks queued — click + New Task to start' : status === 'in_progress' ? 'Nothing running — drag tasks or agents will pick them up' : status === 'review' ? 'No tasks awaiting review' : 'No completed tasks yet';
         el.innerHTML = `<div class="col-empty">${emptyMsg}</div>`;
       } else {
         el.innerHTML = visible.map(t => t.is_live ? liveTaskCardHTML(t) : taskCardHTML(t)).join('');
@@ -368,7 +368,7 @@ async function loadAgents() {
     const res = await fetch(`${API}/api/agents`);
     const data = await res.json();
     const json = JSON.stringify(data);
-    if (json !== _lastAgentsJSON) { _lastAgentsJSON = json; agents = data; rebuildAgentInfo(); renderAgents(); if (currentPage === 'orgchart') renderOrgChart(); }
+    if (json !== _lastAgentsJSON) { _lastAgentsJSON = json; agents = data; rebuildAgentInfo(); renderAgents(); if (currentPage === 'orgchart') { renderOrgChart(); drawOrgConnectors(); } }
   } catch(e) { console.error('Failed to load agents', e); }
 }
 
@@ -1013,9 +1013,41 @@ function renderOrgChart() {
     <div class="org-children ${collapsed}" id="agent-children">${childAgents.map(a => `<div class="org-connector"><div class="org-node"><div class="org-node-avatar">${a.emoji}</div><div class="org-node-name">${a.name}</div><div class="org-node-role">${a.role}</div><div class="org-node-model">${a.model}</div>${a.subagentCount > 0 ? `<div class="org-node-subagents" onclick="event.stopPropagation();openSubagentPanel('${a.id}',event)">🔀 ${a.activeSubagents > 0 ? a.activeSubagents + ' active / ' : ''}${a.subagentCount} ${pluralSub(a.subagentCount)}</div>` : ''}<div class="org-node-status">${statusDot(getStatus(a.id))} <span>${getStatus(a.id)}</span></div></div></div>`).join('')}</div>`;
 }
 
-function toggleOrgChildren(id) { const el = document.getElementById(id); if (el) el.classList.toggle('collapsed'); }
-function expandAllOrg() { orgExpanded = true; document.querySelectorAll('.org-children').forEach(el => el.classList.remove('collapsed')); }
-function collapseAllOrg() { orgExpanded = false; document.querySelectorAll('.org-children').forEach(el => el.classList.add('collapsed')); }
+function toggleOrgChildren(id) { const el = document.getElementById(id); if (el) el.classList.toggle('collapsed'); drawOrgConnectors(); }
+function expandAllOrg() { orgExpanded = true; document.querySelectorAll('.org-children').forEach(el => el.classList.remove('collapsed')); drawOrgConnectors(); }
+function collapseAllOrg() { orgExpanded = false; document.querySelectorAll('.org-children').forEach(el => el.classList.add('collapsed')); drawOrgConnectors(); }
+
+// Draw horizontal connector bars for each visual row of org-children
+function drawOrgConnectors() {
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.org-hbar').forEach(el => el.remove());
+    const container = document.getElementById('agent-children');
+    if (!container || container.classList.contains('collapsed')) return;
+    const connectors = Array.from(container.querySelectorAll(':scope > .org-connector'));
+    if (!connectors.length) return;
+    // Group connectors by their Y position (rows)
+    const rows = {};
+    const containerRect = container.getBoundingClientRect();
+    connectors.forEach(c => {
+      const rect = c.getBoundingClientRect();
+      const rowKey = Math.round(rect.top);
+      if (!rows[rowKey]) rows[rowKey] = [];
+      rows[rowKey].push({ el: c, rect });
+    });
+    // Draw a horizontal bar for each row with 2+ items
+    Object.values(rows).forEach(row => {
+      if (row.length < 2) return;
+      const first = row[0].rect;
+      const last = row[row.length - 1].rect;
+      const leftCenter = first.left + first.width / 2;
+      const rightCenter = last.left + last.width / 2;
+      const bar = document.createElement('div');
+      bar.className = 'org-hbar';
+      bar.style.cssText = `position:absolute;top:${first.top - containerRect.top}px;left:${leftCenter - containerRect.left}px;width:${rightCenter - leftCenter}px;height:2px;background:rgba(0,188,212,0.3);z-index:0;pointer-events:none;`;
+      container.appendChild(bar);
+    });
+  });
+}
 
 // ══════════════════════════════════════════════════════════════
 // SCHEDULED TASKS
@@ -1046,9 +1078,11 @@ function jobRowHTML(job) {
   const durStr = job.last_duration_ms ? `${(job.last_duration_ms/1000).toFixed(1)}s` : '';
   const oneTimeBadge = job.delete_after_run ? '<span class="job-onetime-badge">ONE-TIME</span>' : '';
   const desc = job.description || '';
-  const maxLen = 120;
+  // Adaptive truncation based on viewport width
+  const maxLen = window.innerWidth > 1200 ? 200 : window.innerWidth > 768 ? 140 : 100;
   const needsTrunc = desc.length > maxLen;
-  const truncDesc = needsTrunc ? desc.substring(0, desc.lastIndexOf(' ', maxLen)) + '…' : desc;
+  const truncIdx = needsTrunc ? desc.lastIndexOf(' ', maxLen) : -1;
+  const truncDesc = needsTrunc ? desc.substring(0, truncIdx > 0 ? truncIdx : maxLen) + '…' : desc;
   return `<div class="job-row">
     <span class="job-icon">${lastIcon}</span>
     <span class="job-status-dot" style="background:${statusDot}"></span>
@@ -2102,4 +2136,11 @@ document.addEventListener('DOMContentLoaded', () => {
     new MutationObserver(checkScroll).observe(agentsList, { childList: true });
     setTimeout(checkScroll, 2000);
   }
+});
+
+// Redraw org connectors on resize
+let _orgResizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(_orgResizeTimer);
+  _orgResizeTimer = setTimeout(() => { if (currentPage === 'orgchart') drawOrgConnectors(); }, 200);
 });

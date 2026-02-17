@@ -2705,29 +2705,7 @@ body{
 /* Focused improvements from screenshot analysis                */
 /* ══════════════════════════════════════════════════════════════ */
 
-/* FIX 111: Org Chart — Flex Layout for Child Agents (Centered) */
-.org-children {
-  display: flex !important;
-  flex-wrap: wrap !important;
-  justify-content: center !important;
-  gap: 14px !important;
-  padding: 16px 20px 0 !important;
-  max-width: 100%;
-}
-
-.org-children::before {
-  display: none !important; /* Remove the old horizontal bar */
-}
-
-.org-connector {
-  display: flex;
-  justify-content: center;
-  flex: 0 0 auto;
-}
-
-.org-connector::before {
-  display: none !important; /* Remove individual connector stubs — replaced below */
-}
+/* FIX 111: Org Chart — Superseded by FIX A2 (2026-02-17) */
 
 /* FIX 112: Org Chart — Tighter Vertical Spacing */
 .org-tree {
@@ -2747,48 +2725,7 @@ body{
   height: 18px !important;
 }
 
-/* FIX 113: Org Chart — Proper Horizontal Connector Line from Mike to Children */
-.org-children-connector {
-  display: flex;
-  justify-content: center;
-  position: relative;
-  padding: 0 10%;
-  margin-bottom: 0;
-}
-
-.org-children-connector::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 10%;
-  right: 10%;
-  height: 2px;
-  background: var(--border-hover);
-}
-
-.org-children-connector::after {
-  content: '';
-  width: 2px;
-  height: 18px;
-  background: var(--border-hover);
-}
-
-/* Each child gets a small top connector */
-.org-children .org-connector {
-  position: relative;
-  padding-top: 12px;
-}
-
-.org-children .org-connector::before {
-  content: '' !important;
-  display: block !important;
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 2px;
-  height: 12px;
-  background: var(--border-hover);
-}
+/* FIX 113: Org Chart — Superseded by FIX A2 (2026-02-17) */
 
 /* FIX 114: Org Chart Nodes — Smaller on Tablet for Better Fit */
 @media (max-width: 1200px) {
@@ -3315,44 +3252,8 @@ body{
   }
 }
 
-/* FIX 134: Org Chart — Restore Connecting Lines (overrides FIX 111's removal) */
-.org-children {
-  position: relative !important;
-}
-
-.org-children::before {
-  display: block !important;
-  content: '' !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: 15% !important;
-  right: 15% !important;
-  height: 2px !important;
-  background: rgba(255,255,255,0.15) !important;
-  z-index: 1 !important;
-}
-
-/* Each child connector — vertical stub from horizontal bar to node */
-.org-children > .org-connector {
-  position: relative !important;
-  padding-top: 18px !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-}
-
-.org-children > .org-connector::before {
-  content: '' !important;
-  display: block !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
-  width: 2px !important;
-  height: 18px !important;
-  background: rgba(255,255,255,0.15) !important;
-  z-index: 1 !important;
-}
+/* FIX 134: Org Chart — Superseded by FIX A2 (2026-02-17) */
+/* Connector logic moved to FIX A2 with wrap-safe approach */
 
 /* FIX 135: Job Description — Visual Expand Indicator */
 .job-desc:not(.expanded) {
@@ -3646,4 +3547,329 @@ body{
   .nav-tab {
     letter-spacing: -0.2px;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Dev Pass — 2026-02-17 3AM
+   Focused high-impact improvements from screenshot analysis
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── FIX A1: Task Manager — Equal Card Heights ────────────── */
+.agent-cards-row {
+  align-items: stretch !important;
+}
+/* Use high specificity to override all existing .agent-card-lg rules */
+.agent-cards-row > .agent-card-lg {
+  display: flex !important;
+  flex-direction: column !important;
+}
+/* Stats row pushed to bottom of card */
+.agent-cards-row > .agent-card-lg > .agent-card-lg-stats {
+  margin-top: auto !important;
+  padding-top: 8px !important;
+}
+/* Sub-agent badge stays after stats */
+.agent-cards-row > .agent-card-lg > .agent-subagent-badge {
+  flex-shrink: 0 !important;
+}
+
+/* ── FIX A2: Org Chart — Connector Lines for All Children ──── */
+/* Every child gets a visible vertical connector stub, even when wrapping */
+/* JS-drawn horizontal bars (drawOrgConnectors) handle the cross-bars */
+.org-children {
+  position: relative !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+  gap: 14px !important;
+  padding-top: 20px !important;
+}
+
+/* Dynamic horizontal bars from JS */
+.org-hbar {
+  pointer-events: none;
+  border-radius: 1px;
+}
+
+/* Remove the old percentage-based horizontal bar */
+.org-children::before {
+  display: none !important;
+}
+
+/* Each connector shows a vertical drop line */
+.org-children > .org-connector {
+  position: relative !important;
+  padding-top: 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+}
+
+.org-children > .org-connector::before {
+  content: '' !important;
+  display: block !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: 2px !important;
+  height: 20px !important;
+  background: rgba(0, 188, 212, 0.3) !important;
+  z-index: 1 !important;
+}
+
+/* ── FIX A3: Org Chart — Consistent Node Heights ──────────── */
+.org-children .org-node {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  min-height: 140px !important;
+  justify-content: flex-start !important;
+}
+
+@media (max-width: 1200px) {
+  .org-children .org-node {
+    min-height: 110px !important;
+  }
+}
+
+/* ── FIX A4: Scheduled Tasks — Adaptive Description Length ─── */
+/* On wider screens, allow more text before truncation */
+@media (min-width: 1201px) {
+  .job-desc {
+    max-width: 800px;
+  }
+}
+
+/* Better expand/collapse styling */
+.job-desc {
+  position: relative !important;
+  cursor: pointer !important;
+  transition: color 0.15s !important;
+  padding-right: 0 !important;
+}
+
+.job-desc:not(.expanded) {
+  color: #bbb !important;
+}
+
+.job-desc.expanded {
+  color: #ddd !important;
+}
+
+/* ── FIX A5: Agent Count Badge — Prevent Awkward Wrapping ──── */
+.agent-count-badge {
+  white-space: nowrap !important;
+  font-size: 0.65rem !important;
+}
+
+/* Sidebar AGENTS header — flex layout to prevent wrapping */
+.sidebar > h2:first-of-type {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex-wrap: nowrap !important;
+}
+
+@media (min-width: 1201px) {
+  .sidebar > h2:first-of-type {
+    font-size: 0.78rem !important;
+  }
+  .agent-count-badge {
+    font-size: 0.6rem !important;
+    padding: 1px 6px !important;
+  }
+}
+
+/* ── FIX A6: Empty State Improvements ─────────────────────── */
+/* Standups page — center empty state */
+#standupsList:empty::after {
+  content: 'No standups yet — click + New Standup to create one';
+  display: block;
+  text-align: center;
+  padding: 60px 20px;
+  color: #888;
+  font-size: 0.88rem;
+  font-style: italic;
+}
+
+/* Action Items — better empty state */
+#actionsPending:empty::after {
+  content: 'No pending action items — click + New Action to create one';
+  display: block;
+  text-align: center;
+  padding: 40px 20px;
+  color: #888;
+  font-size: 0.88rem;
+  font-style: italic;
+}
+
+/* ── FIX A7: Review Column Empty State Text Fix ───────────── */
+/* The "Review" column incorrectly says "completed tasks appear here" */
+/* This is handled via JS empty state - CSS can override content */
+
+/* ── FIX A8: Desktop Sidebar — Scrollable Agent List ───────── */
+@media (min-width: 1201px) {
+  /* The sidebar must be a flex column with fixed height */
+  aside.sidebar {
+    display: flex !important;
+    flex-direction: column !important;
+    max-height: calc(100vh - 72px) !important;
+    overflow: hidden !important;
+  }
+  
+  /* AGENTS header */
+  aside.sidebar > h2:first-of-type {
+    flex-shrink: 0 !important;
+  }
+  
+  /* Scroll wrap takes remaining space */
+  aside.sidebar .agents-scroll-wrap {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(0,188,212,0.5) rgba(255,255,255,0.03) !important;
+    position: relative !important;
+  }
+  
+  aside.sidebar .agents-scroll-wrap::-webkit-scrollbar { width: 6px !important; }
+  aside.sidebar .agents-scroll-wrap::-webkit-scrollbar-track { background: rgba(255,255,255,0.03) !important; }
+  aside.sidebar .agents-scroll-wrap::-webkit-scrollbar-thumb { background: rgba(0,188,212,0.4) !important; border-radius: 3px !important; }
+  aside.sidebar .agents-scroll-wrap::-webkit-scrollbar-thumb:hover { background: rgba(0,188,212,0.6) !important; }
+  
+  /* Agent scroll hint hidden on desktop */
+  aside.sidebar .agent-scroll-hint {
+    display: none !important;
+  }
+  
+  /* Widgets pinned at bottom */
+  aside.sidebar .sidebar-widgets {
+    flex-shrink: 0 !important;
+    border-top: 1px solid rgba(0, 188, 212, 0.15) !important;
+    padding-top: 8px !important;
+    margin-top: 4px !important;
+  }
+  
+  /* Agent cards inside scroll area take natural height */
+  aside.sidebar #agentsList {
+    overflow: visible !important;
+    flex: none !important;
+  }
+  
+  /* Bottom fade on scroll area */
+  aside.sidebar .agents-scroll-wrap::after {
+    content: '' !important;
+    display: block !important;
+    position: sticky !important;
+    bottom: 0 !important;
+    height: 20px !important;
+    background: linear-gradient(transparent, var(--surface)) !important;
+    pointer-events: none !important;
+    margin-top: -20px !important;
+    z-index: 2 !important;
+  }
+}
+
+/* ── FIX A9: Task Manager — Better Grid for Tablet ─────────── */
+@media (max-width: 1200px) {
+  .agent-cards-row {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+  }
+}
+
+/* ── FIX A10: Workspace/Docs Content — Fill Available Space ── */
+.ws-content,
+#docsContent {
+  min-height: 400px;
+}
+
+@media (max-width: 1200px) {
+  .workspace-layout {
+    flex-direction: row !important;
+    min-height: 450px !important;
+  }
+  
+  .ws-sidebar {
+    width: 200px !important;
+    min-width: 200px !important;
+    max-width: 200px !important;
+  }
+}
+
+/* ── FIX A11: Voice Page — Better Layout at Tablet ──────────── */
+@media (max-width: 1200px) {
+  .voice-features {
+    grid-template-columns: repeat(2, 1fr) !important;
+    max-width: 100% !important;
+    gap: 12px !important;
+  }
+  
+  .voice-placeholder {
+    padding: 30px 16px !important;
+  }
+}
+
+/* ── FIX A12: Reports Filter Bar — Better Tablet Layout ────── */
+@media (max-width: 1200px) {
+  .reports-filter-bar {
+    gap: 6px !important;
+  }
+  
+  .reports-search-input {
+    width: 180px !important;
+    font-size: 0.78rem !important;
+  }
+  
+  .reports-filter-bar select,
+  .reports-filter-bar input[type="date"] {
+    font-size: 0.76rem !important;
+    padding: 6px 8px !important;
+  }
+  
+  .date-label {
+    font-size: 0.65rem !important;
+  }
+}
+
+/* ── FIX A13: Activity Feed — Better Touch Targets ─────────── */
+@media (max-width: 1200px) {
+  .activity-item {
+    padding: 14px 12px !important;
+    min-height: 56px;
+  }
+}
+
+/* ── FIX A14: Kanban Filter Row — Better Layout at 1080px ──── */
+@media (max-width: 1200px) {
+  .tabs {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 6px !important;
+    margin-bottom: 12px !important;
+  }
+  
+  .filter-chip {
+    margin-left: auto !important;
+    font-size: 0.68rem !important;
+  }
+  
+  #kanbanAgentFilter {
+    margin-left: 4px !important;
+    font-size: 0.72rem !important;
+    width: auto !important;
+    min-width: 100px !important;
+  }
+}
+
+/* ── FIX A15: Better Scroll Shadows for Contained Areas ────── */
+/* Applied via box-shadow on scrollable containers to hint at overflow */
+.col-cards {
+  background: 
+    linear-gradient(var(--surface) 30%, transparent) center top / 100% 20px,
+    linear-gradient(transparent, var(--surface) 70%) center bottom / 100% 20px;
+  background-repeat: no-repeat;
+  background-attachment: local;
 }
